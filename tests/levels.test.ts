@@ -28,9 +28,9 @@ describe('levels', () => {
   }
 
   it('таблица ТЗ: число асыков и бросков', () => {
-    expect(LEVELS.map((l) => l.asyks.length)).toEqual([3, 5, 6, 8, 8, 7]);
-    expect(LEVELS.map((l) => l.throws)).toEqual([Infinity, 6, 6, 7, 7, 7]);
-    expect(LEVELS.map((l) => l.par)).toEqual([null, 4, 4, 5, 5, 6]);
+    expect(LEVELS.map((l) => l.asyks.filter((a) => a.type !== 'block').length)).toEqual([3, 5, 6, 8, 8, 7, 5, 7, 6, 7, 9]);
+    expect(LEVELS.map((l) => l.throws)).toEqual([Infinity, 6, 6, 7, 7, 7, 6, 7, 7, 8, 8]);
+    expect(LEVELS.map((l) => l.par)).toEqual([null, 4, 4, 5, 5, 6, 4, 5, 5, 6, 6]);
   });
 });
 

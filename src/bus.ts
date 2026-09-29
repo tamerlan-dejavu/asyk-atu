@@ -1,38 +1,76 @@
-import type { GameMode } from './types';
+import type { BotLevel, GameMode } from './types';
 import type { GameState } from './game/rules/turnState';
 import type { RoundSummary } from './game/rules/round';
+import type { Key } from './i18n';
+
+/** Запрос на старт раунда (UI → игра). */
+export interface StartRequest {
+  mode: GameMode;
+  levelId: number;
+  /** код своего испытания / вызова друга (mode custom) */
+  code?: string;
+  /** режим custom запущен из редактора («Проверить») */
+  editorTest?: boolean;
+  /** результат друга, который нужно побить */
+  challengeScore?: number;
+  challengeName?: string;
+  /** ежедневное: конкретная дата (вызов по ссылке) */
+  dailyKey?: string;
+  /** дуэль: сложность бота */
+  botLevel?: BotLevel;
+  /** бесконечный: seed забега (вызов по ссылке) */
+  runSeed?: number;
+}
 
 export interface HudData {
   mode: GameMode;
   levelId: number;
+  /** название пользовательского испытания */
+  name?: string;
   score: number;
   /** оставшиеся броски; Infinity — без лимита */
   throwsLeft: number;
   throwsTotal: number;
   asyksLeft: number;
   asykTotal: number;
-  /** режим вдвоём */
+  /** режим вдвоём / дуэль */
   player: 0 | 1;
   scores: [number, number];
   versusLeft: [number, number];
+  /** бесконечный режим */
+  wave?: number;
+  botLevel?: BotLevel;
+  botThinking?: boolean;
   /** подсказка у линии броска (до первого броска) */
   showHint: boolean;
 }
 
 export interface ResultData {
   summary: RoundSummary;
+  mode: GameMode;
   levelId: number;
+  name?: string;
   newRecord: boolean;
   bestStars: 0 | 1 | 2 | 3;
   hasNext: boolean;
   /** ежедневное: лучший результат за дату */
   dailyBest?: number;
+  dailyKey?: string;
+  /** бесконечный режим */
+  endless?: { wave: number; total: number; best: number; newBest: boolean; runSeed: number };
+  /** вызов друга / свои испытания */
+  challenge?: { code?: string; friendName?: string; friendScore?: number };
+  editorTest?: boolean;
+  botLevel?: BotLevel;
+  /** сколько тиын получено за раунд (включая достижения) */
+  coins: number;
 }
 
 /** Типизированные события: UI ↔ игра. UI не знает о Phaser, игра не знает о DOM-экранах. */
 export interface BusEvents {
   // UI → игра
-  start: { mode: GameMode; levelId: number };
+  start: StartRequest;
+  continue: undefined;
   restart: undefined;
   next: undefined;
   pause: undefined;
@@ -40,14 +78,20 @@ export interface BusEvents {
   toMenu: undefined;
   skipTutorial: undefined;
   settings: undefined;
+  /** пере-запечь оформление (сақа/площадка/асыки) */
+  look: undefined;
   // игра → UI
   hud: HudData;
   state: GameState;
   tutorial: { step: number }; // -1 — скрыть
-  turn: { player: 0 | 1 } ;
+  turn: { player: 0 | 1 };
   result: ResultData;
   float: { x: number; y: number; text: string; kind: 'pts' | 'combo' };
-  toast: { key: string; params?: Record<string, string | number> };
+  banner: { key: Key; params?: Record<string, string | number> };
+  /** первое появление нового типа тела */
+  hint: { type: 'golden' | 'heavy' | 'block' };
+  achievement: { id: string };
+  toast: { key: Key; params?: Record<string, string | number> };
 }
 
 type Handler<T> = (payload: T) => void;

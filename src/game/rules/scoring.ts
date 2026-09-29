@@ -12,6 +12,13 @@ export function economyBonus(unusedThrows: number, cleared: boolean): number {
   return ECONOMY_BONUS * unusedThrows;
 }
 
+/** Очки за бросок по значениям выбитых тел: сумма value_i + 5·(k − 1) при k ≥ 1. Для одних обычных совпадает с throwScore. */
+export function throwScoreValues(values: number[]): number {
+  const k = values.length;
+  if (k < 1) return 0;
+  return values.reduce((a, b) => a + b, 0) + COMBO_BONUS * (k - 1);
+}
+
 export interface ThrowOutcome {
   /** сколько асыков выбито ЭТИМ броском (без уже засчитанных) */
   k: number;
@@ -35,8 +42,20 @@ export class ScoreKeeper {
     return this.scored.size;
   }
 
-  /** Регистрирует выбитые асыки одного броска и возвращает результат броска. */
-  registerThrow(outIds: string[]): ThrowOutcome {
+  /** Восстановление после перезагрузки: эти асыки уже засчитаны. */
+  restore(ids: string[]): void {
+    for (const id of ids) this.scored.add(id);
+  }
+
+  ids(): string[] {
+    return [...this.scored];
+  }
+
+  /**
+   * Регистрирует выбитые асыки одного броска и возвращает результат броска.
+   * valueOf — очки за конкретное тело (по умолчанию 10, как у обычного асыка).
+   */
+  registerThrow(outIds: string[], valueOf: (id: string) => number = () => POINTS_PER_ASYK): ThrowOutcome {
     const fresh: string[] = [];
     for (const id of outIds) {
       if (!this.scored.has(id)) {
@@ -44,6 +63,6 @@ export class ScoreKeeper {
         fresh.push(id);
       }
     }
-    return { k: fresh.length, points: throwScore(fresh.length), ids: fresh };
+    return { k: fresh.length, points: throwScoreValues(fresh.map(valueOf)), ids: fresh };
   }
 }

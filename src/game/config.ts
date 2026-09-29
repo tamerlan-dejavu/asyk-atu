@@ -54,6 +54,14 @@ export const SAKA = {
 };
 export const WALL_RESTITUTION = 0.5;
 
+// --- Типы тел (данные уровней: поле type у асыка) ---
+/** Очки за выбитое тело каждого типа; блок (препятствие) не выбивается и очков не даёт. */
+export const ASYK_VALUE = { normal: 10, golden: 30, heavy: 15, block: 0 } as const;
+/** Тяжёлый асык: плотность x2.5 и сопротивление воздуха +30 % — сдвинуть трудно, бить нужно сильно. */
+export const HEAVY = { densityMul: 2.5, frictionAirMul: 1.3 };
+/** Блок: статичный «камень» 40x40 со скруглёнными углами; сақа и асыки от него отскакивают. */
+export const BLOCK = { size: 40, radius: 8, restitution: 0.5 };
+
 // --- Остановка ---
 export const SETTLE_SPEED = 0.05;
 export const SETTLE_ANGULAR = 0.01;

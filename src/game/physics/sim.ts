@@ -11,13 +11,14 @@ import {
   TURN_TIMEOUT_MS,
   VELOCITY_ITERATIONS,
 } from '../config';
-import type { AsykSpec, ZoneSpec } from '../../types';
+import type { AsykSpec, AsykType, ZoneSpec } from '../../types';
 import { createAsykBody, createSakaBody, createWalls, type MatterNS, type MBody } from './bodies';
 import { isSettledNow } from './settle';
 
 export interface SimBody {
   id: string;
   kind: 'asyk' | 'saka';
+  type: AsykType;
   body: MBody;
   scored: boolean;
   /** тик, когда асык был засчитан (для удаления через OUT_FADE_MS) */
@@ -86,9 +87,10 @@ export class Sim {
   }
 
   addAsyk(id: string, spec: AsykSpec): SimBody {
-    const body = createAsykBody(this.M, id, spec.x, spec.y, spec.angle);
+    const type = spec.type ?? 'normal';
+    const body = createAsykBody(this.M, id, spec.x, spec.y, spec.angle, type);
     this.M.Composite.add(this.engine.world, body);
-    const sb: SimBody = { id, kind: 'asyk', body, scored: false, scoredTick: -1, removed: false };
+    const sb: SimBody = { id, kind: 'asyk', type, body, scored: false, scoredTick: -1, removed: false };
     this.bodies.set(id, sb);
     return sb;
   }
@@ -100,7 +102,7 @@ export class Sim {
     body.deltaTime = SUB_DELTA;
     this.M.Composite.add(this.engine.world, body);
     this.M.Body.setVelocity(body, { x: vx, y: vy });
-    this.saka = { id: 'saka', kind: 'saka', body, scored: false, scoredTick: -1, removed: false };
+    this.saka = { id: 'saka', kind: 'saka', type: 'normal', body, scored: false, scoredTick: -1, removed: false };
     this.bodies.set('saka', this.saka);
     this.throwTick = this.tick;
     this.timedOut = false;
@@ -121,9 +123,9 @@ export class Sim {
     return [...this.bodies.values()].filter((b) => b.kind === 'asyk' && !b.removed);
   }
 
-  /** Асыки, ещё стоящие в коне (не засчитанные). */
+  /** Выбиваемые асыки, ещё стоящие в коне (блоки не в счёте). */
   standing(): SimBody[] {
-    return this.asyks().filter((b) => !b.scored);
+    return this.asyks().filter((b) => !b.scored && b.type !== 'block');
   }
 
   /** Один шаг физики 1/60 с (внутри — SUBSTEPS подшагов). */
@@ -144,7 +146,7 @@ export class Sim {
     const newlyScored: string[] = [];
     const removed: string[] = [];
     for (const sb of this.bodies.values()) {
-      if (sb.kind !== 'asyk' || sb.removed) continue;
+      if (sb.kind !== 'asyk' || sb.removed || sb.type === 'block') continue;
       if (!sb.scored) {
         const p = sb.body.position;
         // «Выбит»: центр вышел за границу кона. Один раз, навсегда.

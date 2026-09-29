@@ -1,10 +1,14 @@
 import Phaser from 'phaser';
-import { bus, type HudData } from '../bus';
+import { bus, type HudData, type StartRequest } from '../bus';
 import { sfx } from '../audio/sfx';
+import { decodeChallenge, challengeToLevel } from '../challenge/codec';
 import { applyLevelResult, store } from '../storage/save';
-import type { GameMode, LevelDef } from '../types';
+import { HAPTIC, vibrate } from '../util/haptics';
+import type { AsykType, BotLevel, GameMode, LevelDef, ResultEntry, ResumeState } from '../types';
 import {
+  AIM_ZONE_Y,
   ASYK,
+  BLOCK,
   FIELD_H,
   FIELD_W,
   MAX_BODY_SPEED,
@@ -18,17 +22,20 @@ import {
   STEP_MS,
   THROW_LINE_Y,
   ZONE,
-  AIM_ZONE_Y,
 } from './config';
+import { chooseShot, type Shot } from './bot';
 import { AimController, type AimState } from './input/AimController';
 import { dailyLevel, dateKey } from './levels/daily';
-import { getLevel, VERSUS_LEVEL } from './levels/levels';
+import { endlessWave, nextReserve } from './levels/endless';
+import { getLevel, nextLevelId, VERSUS_LEVEL } from './levels/levels';
+import { hashString, mulberry32 } from './levels/rng';
 import { Sim, type SimBody, type StepResult } from './physics/sim';
+import { COIN, levelCoins, processEvent, type AchEvent } from './rules/achievements';
 import { DepthTracker } from './render/depth';
 import { Effects, type FxFlags } from './render/effects';
 import { Parallax } from './render/parallax';
-import { bakeAll, TEX } from './render/textures';
-import { Round } from './rules/round';
+import { bakeAll, bakeLook, TEX } from './render/textures';
+import { Round, specId } from './rules/round';
 import type { GameState } from './rules/turnState';
 
 interface BodySprites {
@@ -37,6 +44,16 @@ interface BodySprites {
   body: Phaser.GameObjects.Image;
   hl: Phaser.GameObjects.Image;
   kind: 'asyk' | 'saka';
+  type: AsykType;
+}
+
+interface RunCtx {
+  wave: number;
+  runSeed: number;
+  totalScore: number;
+  reserve: number;
+  botLevel: BotLevel;
+  dailyKey: string;
 }
 
 const D_GROUND = 0;
@@ -51,6 +68,7 @@ const D_NEAR = 9;
 const D_TEXT = 10;
 
 const HL_OFFSET = { x: -7, y: -6 }; // источник света сверху-слева: блик не вращается вместе с телом
+const BODY_TEX: Record<AsykType, string> = { normal: 'asyk', golden: 'asykGolden', heavy: 'asykHeavy', block: 'block' };
 
 declare global {
   interface Window {
@@ -73,11 +91,15 @@ export function powerColor(p: number): number {
   return p < 0.5 ? lerpColor(0x3fbf5a, 0xf2c230, p * 2) : lerpColor(0xf2c230, 0xe5482f, (p - 0.5) * 2);
 }
 
+const finite = (n: number) => (Number.isFinite(n) ? n : 0);
+
 export class GameScene extends Phaser.Scene {
   private S = 1;
   private sim: Sim | null = null;
   private round: Round | null = null;
   private level: LevelDef | null = null;
+  private req: StartRequest = { mode: 'campaign', levelId: 1 };
+  private ctx: RunCtx = { wave: 1, runSeed: 1, totalScore: 0, reserve: 0, botLevel: 'normal', dailyKey: '' };
   private sprites = new Map<string, BodySprites>();
   private acc = 0;
   private aim!: AimController;
@@ -98,9 +120,12 @@ export class GameScene extends Phaser.Scene {
   private autoLow = false;
   private fpsAcc = { t: 0, n: 0 };
   private reducedMq = window.matchMedia('(prefers-reduced-motion: reduce)');
-  private startedMode: GameMode = 'campaign';
-  private startedLevel = 1;
   private nowMs = 0;
+  private coinsEarned = 0;
+  private botToken = 0;
+  private botThinking = false;
+  private botAim: { t: number; dur: number; shot: Shot } | null = null;
+  private botRnd: () => number = mulberry32(1);
 
   constructor() {
     super('game');
@@ -110,7 +135,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.S = Math.min(2, window.devicePixelRatio || 1);
     const S = this.S;
-    bakeAll(this, S, ZONE.r);
+    bakeAll(this, S, ZONE.r, store.data.equipped);
 
     // Камера: мировые координаты остаются логическими 720×1080, изображение — чётким на HiDPI.
     const cam = this.cameras.main;
@@ -137,13 +162,12 @@ export class GameScene extends Phaser.Scene {
       .setResolution(S)
       .setVisible(false);
     this.fx = new Effects(this, S, S, D_FX);
-    this.idle = this.makeSprites('saka');
-    this.idle.body.setVisible(false);
+    this.idle = this.makeSprites('saka', 'normal');
     this.hideSprites(this.idle);
 
     this.aim = new AimController({
       canvas: this.game.canvas,
-      canAim: () => this.round?.machine.state === 'AIMING',
+      canAim: () => this.canAim(),
       onStart: () => this.onAimStart(),
       onMove: (s) => this.onAimMove(s),
       onRelease: (p, dx, dy) => this.onRelease(p, dx, dy),
@@ -163,17 +187,23 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('pointerdown', unlock, { capture: true });
     window.addEventListener('keydown', unlock, { capture: true });
 
-    // Вкладка в фоне / потеря фокуса → пауза.
+    // Вкладка в фоне → пауза.
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.pauseGame();
     });
 
-    bus.on('start', ({ mode, levelId }) => this.startRound(mode, levelId));
-    bus.on('restart', () => this.startRound(this.startedMode, this.startedLevel));
-    bus.on('next', () => this.startRound(this.startedMode, this.startedLevel + 1));
+    bus.on('start', (req) => this.startRound(req));
+    bus.on('continue', () => this.continueRound());
+    bus.on('restart', () => this.restartRound());
+    bus.on('next', () => {
+      const id = nextLevelId(this.level?.id ?? 0, store.data.pro);
+      if (id !== undefined) this.startRound({ mode: 'campaign', levelId: id });
+      else this.toMenu();
+    });
     bus.on('pause', () => this.pauseGame());
     bus.on('resume', () => this.resumeGame());
     bus.on('toMenu', () => this.toMenu());
+    bus.on('look', () => bakeLook(this, S, store.data.equipped));
     bus.on('skipTutorial', () => {
       store.update((s) => {
         s.tutorialDone = true;
@@ -186,15 +216,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ спрайты
-  private makeSprites(kind: 'asyk' | 'saka'): BodySprites {
-    const isA = kind === 'asyk';
-    const tex = isA ? TEX.asyk : TEX.saka;
-    const shadow = this.add.image(0, 0, isA ? 'shadowAsyk' : 'shadowSaka').setDepth(D_SHADOW);
-    const contact = this.add.image(0, 0, isA ? 'shadowAsyk' : 'shadowSaka').setDepth(D_SHADOW);
-    const body = this.add.image(0, 0, isA ? 'asyk' : 'saka').setDepth(D_BODY).setDisplaySize(tex.w, tex.h);
-    const hl = this.add.image(0, 0, isA ? 'hlAsyk' : 'hlSaka').setDepth(D_HL);
-    hl.setDisplaySize(isA ? 20 : 30, isA ? 13 : 20);
-    return { shadow, contact, body, hl, kind };
+  private makeSprites(kind: 'asyk' | 'saka', type: AsykType): BodySprites {
+    const isSaka = kind === 'saka';
+    const isBlock = type === 'block';
+    const tex = isSaka ? TEX.saka : isBlock ? TEX.block : TEX.asyk;
+    const shKey = isSaka ? 'shadowSaka' : isBlock ? 'shadowBlock' : 'shadowAsyk';
+    const shadow = this.add.image(0, 0, shKey).setDepth(D_SHADOW);
+    const contact = this.add.image(0, 0, shKey).setDepth(D_SHADOW);
+    const body = this.add.image(0, 0, isSaka ? 'saka' : BODY_TEX[type]).setDepth(D_BODY).setDisplaySize(tex.w, tex.h);
+    const hl = this.add.image(0, 0, isSaka ? 'hlSaka' : 'hlAsyk').setDepth(D_HL);
+    hl.setDisplaySize(isSaka ? 30 : 20, isSaka ? 20 : 13);
+    return { shadow, contact, body, hl, kind, type };
   }
 
   private hideSprites(s: BodySprites): void {
@@ -221,27 +253,32 @@ export class GameScene extends Phaser.Scene {
     alpha: number,
     scaleMul: number,
     flags: { soft: boolean; bounce: boolean },
+    hlMul = 1,
   ): void {
-    const isA = s.kind === 'asyk';
-    const tex = isA ? TEX.asyk : TEX.saka;
-    const sh = isA ? TEX.shadowAsyk : TEX.shadowSaka;
-    const base = isA ? ASYK : SAKA;
-    const zz = flags.bounce ? z : 0;
+    const isSaka = s.kind === 'saka';
+    const isBlock = s.type === 'block';
+    const tex = isSaka ? TEX.saka : isBlock ? TEX.block : TEX.asyk;
+    const sh = isSaka ? TEX.shadowSaka : isBlock ? TEX.shadowBlock : TEX.shadowAsyk;
+    const shKey = isSaka ? 'shadowSaka' : isBlock ? 'shadowBlock' : 'shadowAsyk';
+    const simpleKey = isSaka ? 'simpleShadowSaka' : isBlock ? 'simpleShadowBlock' : 'simpleShadowAsyk';
+    const base = isSaka ? SAKA : isBlock ? { w: BLOCK.size, h: BLOCK.size } : ASYK;
+    const zz = flags.bounce && !isBlock ? z : 0;
     const scale = (1 + zz * 0.004) * scaleMul;
     s.body.setVisible(true).setPosition(x, y - zz).setRotation(angle).setDisplaySize(tex.w * scale, tex.h * scale).setAlpha(alpha);
-    s.hl.setVisible(true).setPosition(x + HL_OFFSET.x * scale, y - zz + HL_OFFSET.y * scale).setAlpha(alpha * 0.9);
+    if (isBlock) s.hl.setVisible(false);
+    else s.hl.setVisible(true).setPosition(x + HL_OFFSET.x * scale, y - zz + HL_OFFSET.y * scale).setAlpha(alpha * 0.9 * hlMul);
     // Тень: смещение задаётся направлением света, а не углом тела; растёт и светлеет с z.
     const off = SHADOW_OFFSET + zz * 0.9;
     if (flags.soft) {
       s.shadow
-        .setTexture(isA ? 'shadowAsyk' : 'shadowSaka')
+        .setTexture(shKey)
         .setVisible(true)
         .setPosition(x + off, y + off * 1.1)
         .setRotation(angle)
         .setDisplaySize(sh.w * scaleMul, sh.h * scaleMul)
         .setAlpha(Math.max(0.1, (0.85 - zz * 0.05) * alpha));
       s.contact
-        .setTexture(isA ? 'shadowAsyk' : 'shadowSaka')
+        .setTexture(shKey)
         .setVisible(zz < 1)
         .setPosition(x + 1, y + 1.5)
         .setRotation(angle)
@@ -250,7 +287,7 @@ export class GameScene extends Phaser.Scene {
     } else {
       s.contact.setVisible(false);
       s.shadow
-        .setTexture(isA ? 'simpleShadowAsyk' : 'simpleShadowSaka')
+        .setTexture(simpleKey)
         .setVisible(true)
         .setPosition(x + 4, y + 5)
         .setRotation(angle)
@@ -268,10 +305,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ раунд
-  private buildLevel(mode: GameMode, levelId: number): LevelDef {
-    if (mode === 'versus') return VERSUS_LEVEL;
-    if (mode === 'daily') return dailyLevel(dateKey());
-    return getLevel(levelId);
+  private canAim(): boolean {
+    const r = this.round;
+    if (!r || r.machine.state !== 'AIMING') return false;
+    if (r.mode === 'duel' && r.player === 1) return false;
+    return true;
+  }
+
+  private buildLevel(req: StartRequest): LevelDef | null {
+    switch (req.mode) {
+      case 'versus':
+      case 'duel':
+        return VERSUS_LEVEL;
+      case 'daily':
+        return dailyLevel(req.dailyKey ?? dateKey());
+      case 'endless':
+        return endlessWave(this.ctx.runSeed, this.ctx.wave, this.ctx.reserve);
+      case 'custom': {
+        if (!req.code) return null;
+        const d = decodeChallenge(req.code);
+        return d.ok ? challengeToLevel(d.challenge) : null;
+      }
+      default:
+        try {
+          return getLevel(req.levelId);
+        } catch {
+          return null;
+        }
+    }
   }
 
   private clearWorld(): void {
@@ -281,45 +342,119 @@ export class GameScene extends Phaser.Scene {
     this.timers = [];
     this.pendingOut = [];
     this.sakaFade = -1;
+    this.botToken++;
+    this.botThinking = false;
+    this.botAim = null;
     this.hideSprites(this.idle);
     this.aim.cancel();
   }
 
-  private startRound(mode: GameMode, levelId: number): void {
+  private restartRound(): void {
+    const req = { ...this.req };
+    if (req.mode === 'endless') req.runSeed = undefined; // «Ещё раз» — новый забег
+    this.startRound(req);
+  }
+
+  private startRound(req: StartRequest, resume?: ResumeState): void {
     this.clearWorld();
-    if (mode === 'campaign' && levelId > 5) {
+    this.req = { ...req };
+    this.coinsEarned = 0;
+    const ex = resume?.extra;
+    this.ctx = {
+      wave: ex?.wave ?? 1,
+      runSeed: ex?.runSeed ?? req.runSeed ?? (hashString(String(Date.now())) >>> 0) % 1000000,
+      totalScore: ex?.totalScore ?? 0,
+      reserve: ex?.reserve ?? 0,
+      botLevel: ex?.botLevel ?? req.botLevel ?? 'normal',
+      dailyKey: ex?.dailyKey ?? req.dailyKey ?? dateKey(),
+    };
+    let level: LevelDef | null;
+    if (resume) {
+      level = {
+        id: resume.level.id,
+        nameKey: resume.level.nameKey,
+        name: resume.level.name,
+        throws: resume.level.throws ?? Infinity,
+        par: resume.level.par,
+        zone: resume.level.zone,
+        asyks: resume.level.asyks,
+      };
+    } else {
+      level = this.buildLevel(req);
+    }
+    if (!level) {
+      bus.emit('toast', { key: 'badLink' });
       this.toMenu();
       return;
     }
-    this.startedMode = mode;
-    this.startedLevel = levelId;
-    const level = this.buildLevel(mode, levelId);
+    this.setupRound(level, req.mode, resume);
+  }
+
+  private continueRound(): void {
+    const rs = store.data.resume;
+    if (!rs) return;
+    this.startRound(
+      {
+        mode: rs.mode,
+        levelId: rs.levelId,
+        botLevel: rs.extra.botLevel,
+        dailyKey: rs.extra.dailyKey,
+        challengeScore: rs.extra.challengeScore,
+        challengeName: rs.extra.challengeName,
+        runSeed: rs.extra.runSeed,
+      },
+      rs,
+    );
+  }
+
+  private setupRound(level: LevelDef, mode: GameMode, resume?: ResumeState): void {
     this.level = level;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const M = (Phaser.Physics.Matter as any).Matter;
-    this.sim = new Sim(M, level.zone);
+    const sim = new Sim(M, level.zone);
+    this.sim = sim;
     level.asyks.forEach((a, i) => {
-      const id = `a${i}`;
-      this.sim!.addAsyk(id, a);
-      this.sprites.set(id, this.makeSprites('asyk'));
+      const id = specId(a, i);
+      sim.addAsyk(id, a);
+      this.sprites.set(id, this.makeSprites('asyk', a.type ?? 'normal'));
     });
-    this.round = new Round(mode, level);
-    this.firstThrow = false;
-    this.tutorial = mode === 'campaign' && levelId === 0;
+    const easy = store.data.difficulty === 'easy' && (mode === 'campaign' || mode === 'training');
+    this.round = new Round(mode, level, { bonusThrows: easy ? 1 : 0, snapshot: resume?.round });
+    this.firstThrow = Boolean(resume) && resume!.round.throwsUsed > 0;
+    this.tutorial = mode === 'campaign' && level.id === 0;
     this.acc = 0;
+    if (mode === 'duel') this.botRnd = mulberry32(hashString(`bot:${Date.now()}`));
     this.round.machine.go('LEVEL_INTRO');
     this.syncAll();
     this.publish();
     bus.emit('state', 'LEVEL_INTRO');
-    this.after(700, () => {
-      if (!this.round) return;
-      this.round.machine.go('AIMING');
-      this.showIdleSaka();
-      this.publish();
-      bus.emit('state', 'AIMING');
-      if (this.tutorial) bus.emit('tutorial', { step: 0 });
-      if (mode === 'versus') bus.emit('turn', { player: this.round.player });
-    });
+    this.after(700, () => this.enterAiming(true));
+  }
+
+  private enterAiming(first = false): void {
+    const r = this.round;
+    if (!r) return;
+    r.machine.go('AIMING');
+    this.showIdleSaka();
+    this.publish();
+    bus.emit('state', 'AIMING');
+    if (this.tutorial) bus.emit('tutorial', { step: r.throwsUsed === 0 ? 0 : 3 });
+    if (r.isVersus) bus.emit('turn', { player: r.player });
+    this.writeResume();
+    if (first && r.throwsUsed === 0) this.announceNewTypes();
+    if (r.mode === 'duel' && r.player === 1) void this.botTurn();
+  }
+
+  /** Короткая подсказка о новом типе тела — один раз (seenHints). */
+  private announceNewTypes(): void {
+    const level = this.level;
+    if (!level) return;
+    for (const t of ['golden', 'heavy', 'block'] as const) {
+      if (level.asyks.some((a) => a.type === t) && !store.data.seenHints.includes(t)) {
+        bus.emit('hint', { type: t });
+        return;
+      }
+    }
   }
 
   private toMenu(): void {
@@ -349,6 +484,86 @@ export class GameScene extends Phaser.Scene {
 
   private after(ms: number, fn: () => void): void {
     this.timers.push({ t: ms, fn });
+  }
+
+  // ------------------------------------------------------------------ «Продолжить»
+  /** После каждого разрешённого броска пишем состояние: тела неподвижны, восстановление точное. */
+  private writeResume(): void {
+    const r = this.round;
+    const sim = this.sim;
+    const lv = this.level;
+    if (!r || !sim || !lv) return;
+    if (r.mode === 'training') return;
+    if (r.mode === 'campaign' && lv.id === 0) return;
+    if (r.mode === 'custom' && this.req.editorTest) return;
+    const asyks = sim
+      .asyks()
+      .filter((b) => !b.scored)
+      .map((b) => ({ id: b.id, x: b.body.position.x, y: b.body.position.y, angle: b.body.angle, type: b.type }));
+    if (asyks.length === 0) return;
+    const rs: ResumeState = {
+      v: 1,
+      ts: Date.now(),
+      mode: r.mode,
+      levelId: lv.id,
+      level: {
+        id: lv.id,
+        nameKey: lv.nameKey,
+        name: lv.name,
+        throws: Number.isFinite(lv.throws) ? lv.throws : null,
+        par: lv.par,
+        zone: lv.zone,
+        asyks,
+      },
+      round: r.snapshot(),
+      extra: {
+        wave: r.mode === 'endless' ? this.ctx.wave : undefined,
+        runSeed: r.mode === 'endless' ? this.ctx.runSeed : undefined,
+        totalScore: r.mode === 'endless' ? this.ctx.totalScore : undefined,
+        reserve: r.mode === 'endless' ? this.ctx.reserve : undefined,
+        botLevel: r.mode === 'duel' ? this.ctx.botLevel : undefined,
+        dailyKey: r.mode === 'daily' ? this.ctx.dailyKey : undefined,
+        challengeScore: this.req.challengeScore,
+        challengeName: this.req.challengeName,
+      },
+    };
+    store.update((s) => {
+      s.resume = rs;
+    });
+  }
+
+  // ------------------------------------------------------------------ бот
+  private async botTurn(): Promise<void> {
+    const sim = this.sim;
+    const level = this.level;
+    const r = this.round;
+    if (!sim || !level || !r) return;
+    const token = ++this.botToken;
+    this.botThinking = true;
+    this.publish();
+    const specs = sim
+      .asyks()
+      .filter((b) => !b.scored)
+      .map((b) => ({ x: b.body.position.x, y: b.body.position.y, angle: b.body.angle, type: b.type }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const M = (Phaser.Physics.Matter as any).Matter;
+    const { shot } = await chooseShot(M, level.zone, specs, this.ctx.botLevel, this.botRnd, { deadlineMs: 800 });
+    if (token !== this.botToken || !this.round) return;
+    this.botThinking = false;
+    // анимация «бот целится»: видимое оттягивание сақа 600–900 мс
+    this.botAim = { t: 0, dur: 600 + Math.round(this.botRnd() * 300), shot };
+    this.publish();
+  }
+
+  private aimState(): AimState {
+    const b = this.botAim;
+    if (b) {
+      const u = Math.min(1, b.t / b.dur);
+      const eased = 1 - Math.pow(1 - u, 2);
+      const power = b.shot.power * eased;
+      return { active: true, mode: 'keys', ax: 0, ay: 0, cx: 0, cy: 0, pull: 24 + power * 146, power, dirX: b.shot.dirX, dirY: b.shot.dirY, valid: true };
+    }
+    return this.aim.state;
   }
 
   // ------------------------------------------------------------------ ввод
@@ -382,7 +597,7 @@ export class GameScene extends Phaser.Scene {
     this.powerText.setVisible(false);
     const v = POWER_MIN + (POWER_MAX - POWER_MIN) * power;
     sim.launchSaka(dirX * v, dirY * v, Math.atan2(dirY, dirX));
-    this.sprites.set('saka', this.makeSprites('saka'));
+    this.sprites.set('saka', this.makeSprites('saka', 'normal'));
     this.hideSprites(this.idle);
     r.beginThrow();
     this.firstThrow = true;
@@ -409,6 +624,14 @@ export class GameScene extends Phaser.Scene {
     const st = r?.machine.state;
     if (r && st !== 'PAUSED') {
       this.tickTimers(dt);
+      if (this.botAim && r.machine.state === 'AIMING') {
+        this.botAim.t += dt;
+        if (this.botAim.t >= this.botAim.dur) {
+          const s = this.botAim.shot;
+          this.botAim = null;
+          this.onRelease(s.power, s.dirX, s.dirY);
+        }
+      }
       if (r.machine.state === 'FLYING' || r.machine.state === 'SETTLING') this.stepPhysics(dt);
     }
 
@@ -480,14 +703,18 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private isBody(id: string): boolean {
+    return id !== 'wall';
+  }
+
   private processStep(res: StepResult): void {
     const f = this.flags;
     const fxFlags: FxFlags = { motion: f.motion };
+    const r = this.round!;
     for (const h of res.hits) {
-      const asykOrSaka = (id: string) => id === 'saka' || id.startsWith('a');
-      if (asykOrSaka(h.a)) this.depth.onHit(h.a, h.impulse, this.nowMs);
-      if (asykOrSaka(h.b)) this.depth.onHit(h.b, h.impulse, this.nowMs);
-      if ((h.a === 'saka' && h.b.startsWith('a')) || (h.b === 'saka' && h.a.startsWith('a'))) {
+      if (this.isBody(h.a)) this.depth.onHit(h.a, h.impulse, this.nowMs);
+      if (this.isBody(h.b)) this.depth.onHit(h.b, h.impulse, this.nowMs);
+      if ((h.a === 'saka' && this.isBody(h.b) && h.b !== 'saka') || (h.b === 'saka' && this.isBody(h.a) && h.a !== 'saka')) {
         this.sakaHitAsyk = true;
         if (h.impulse > 4) this.fx.bump(fxFlags);
       }
@@ -495,13 +722,16 @@ export class GameScene extends Phaser.Scene {
       if (h.impulse > 0.8 && this.nowMs - this.lastHitSound > 45) {
         this.lastHitSound = this.nowMs;
         sfx.hit(h.impulse / 14);
+        vibrate(HAPTIC.hit);
       }
     }
     for (const id of res.newlyScored) {
+      if (r.typeOf(id) === 'block') continue;
       this.pendingOut.push(id);
       sfx.out();
+      vibrate(HAPTIC.out);
       const sb = this.sim!.bodies.get(id);
-      if (sb) bus.emit('float', { x: sb.body.position.x, y: sb.body.position.y - 24, text: '+10', kind: 'pts' });
+      if (sb) bus.emit('float', { x: sb.body.position.x, y: sb.body.position.y - 24, text: `+${r.valueOf(id)}`, kind: 'pts' });
     }
     for (const id of res.removed) {
       const s = this.sprites.get(id);
@@ -510,6 +740,21 @@ export class GameScene extends Phaser.Scene {
         this.sprites.delete(id);
       }
     }
+  }
+
+  private ach(ev: AchEvent): void {
+    const out = processEvent(store.data, ev);
+    store.persist();
+    this.coinsEarned += out.coins;
+    out.unlocked.forEach((id) => bus.emit('achievement', { id }));
+  }
+
+  private addCoins(n: number): void {
+    if (n <= 0) return;
+    store.update((s) => {
+      s.coins += n;
+    });
+    this.coinsEarned += n;
   }
 
   /** Ход окончен: подсчёт очков, затем следующий бросок / итог. */
@@ -524,6 +769,7 @@ export class GameScene extends Phaser.Scene {
       this.fx.shake({ motion: this.flags.motion });
       bus.emit('float', { x: ZONE.x, y: ZONE.y, text: `+${points}`, kind: 'combo' });
       sfx.combo(k);
+      vibrate(HAPTIC.combo);
     }
     if (r.mode !== 'training') {
       store.update((s) => {
@@ -531,6 +777,7 @@ export class GameScene extends Phaser.Scene {
         s.stats.asyksOut += k;
         if (k > 0) s.stats.hits++;
       });
+      this.ach({ type: 'throw', mode: r.mode, k, golden: res.goldenOut });
     }
     this.publish();
     bus.emit('state', r.machine.state);
@@ -546,57 +793,135 @@ export class GameScene extends Phaser.Scene {
       }
       this.sakaFade = -1;
       if (!this.round) return;
-      if (res.next === 'AIMING') {
-        r.machine.go('AIMING');
-        this.showIdleSaka();
-        if (this.tutorial) bus.emit('tutorial', { step: 3 });
-        if (r.mode === 'versus') bus.emit('turn', { player: r.player });
-        this.publish();
-        bus.emit('state', r.machine.state);
-      } else {
-        this.finish(res.next);
-      }
+      if (res.next === 'AIMING') this.enterAiming();
+      else this.finish(res.next);
+    });
+  }
+
+  private pushHistory(entry: ResultEntry): void {
+    store.update((s) => {
+      s.history.push(entry);
+      if (s.history.length > 50) s.history.splice(0, s.history.length - 50);
     });
   }
 
   private finish(next: 'LEVEL_COMPLETE' | 'LEVEL_FAILED'): void {
     const r = this.round!;
+    const level = this.level!;
     r.machine.go(next);
     const summary = r.summary();
+    const win = next === 'LEVEL_COMPLETE';
+    const mode = r.mode;
     let newRecord = false;
     let bestStars: 0 | 1 | 2 | 3 = summary.stars;
     let dailyBest: number | undefined;
-    const levelId = this.level!.id;
-    if (r.mode === 'campaign') {
+
+    store.update((s) => {
+      s.resume = null;
+    });
+
+    // ---- бесконечный режим: очищенная волна ведёт к следующей без экрана итога
+    if (mode === 'endless' && win) {
+      this.ctx.totalScore += summary.score;
+      this.ctx.reserve = nextReserve(finite(r.throwsLeft));
+      this.ctx.wave++;
+      this.addCoins(COIN.wave);
       store.update((s) => {
-        const info = applyLevelResult(s, levelId, summary.score, summary.stars);
+        s.endlessBest.wave = Math.max(s.endlessBest.wave, this.ctx.wave - 1);
+        s.endlessBest.score = Math.max(s.endlessBest.score, this.ctx.totalScore);
+      });
+      this.ach({ type: 'wave', wave: this.ctx.wave });
+      sfx.win();
+      bus.emit('state', next);
+      bus.emit('banner', { key: 'waveN', params: { n: this.ctx.wave } });
+      this.after(1000, () => {
+        const lv = endlessWave(this.ctx.runSeed, this.ctx.wave, this.ctx.reserve);
+        this.clearWorld();
+        this.setupRound(lv, 'endless');
+      });
+      return;
+    }
+
+    this.ach({
+      type: 'levelEnd',
+      mode,
+      cleared: summary.cleared,
+      throwsLeft: finite(r.throwsLeft),
+      botHardWon: mode === 'duel' && this.ctx.botLevel === 'hard' && summary.winner === 0,
+    });
+
+    let endless: ResultDataEndless | undefined;
+    if (mode === 'campaign') {
+      const first = store.data.levels[String(level.id)] === undefined;
+      store.update((s) => {
+        const info = applyLevelResult(s, level.id, summary.score, summary.stars);
         newRecord = info.newRecord && summary.score > 0;
         bestStars = info.bestStars;
-        if (levelId === 0 && summary.cleared) s.tutorialDone = true;
+        if (level.id === 0 && summary.cleared) s.tutorialDone = true;
       });
-    } else if (r.mode === 'daily') {
-      const key = dateKey();
+      if (win && !(level.id === 0 && !first)) this.addCoins(levelCoins(summary.stars));
+    } else if (mode === 'daily') {
+      const key = this.ctx.dailyKey;
+      const firstToday = store.data.daily[key] === undefined;
       store.update((s) => {
         const prev = s.daily[key]?.best ?? 0;
         newRecord = summary.score > prev;
         s.daily[key] = { best: Math.max(prev, summary.score) };
         dailyBest = s.daily[key].best;
       });
+      if (firstToday) this.addCoins(COIN.daily);
+      this.ach({ type: 'daily', date: key });
+    } else if (mode === 'endless') {
+      const total = this.ctx.totalScore + summary.score;
+      const reached = this.ctx.wave;
+      let newBest = false;
+      store.update((s) => {
+        newBest = total > s.endlessBest.score;
+        s.endlessBest.score = Math.max(s.endlessBest.score, total);
+        s.endlessBest.wave = Math.max(s.endlessBest.wave, reached - 1);
+      });
+      endless = { wave: reached, total, best: store.data.endlessBest.score, newBest, runSeed: this.ctx.runSeed };
+      newRecord = newBest;
     }
+
+    if (mode !== 'training' && !(mode === 'custom' && this.req.editorTest)) {
+      this.pushHistory({
+        ts: Date.now(),
+        mode,
+        ref: mode === 'daily' ? this.ctx.dailyKey : mode === 'endless' ? `w${this.ctx.wave}` : `L${level.id}`,
+        score: endless ? endless.total : summary.score,
+        stars: summary.stars,
+        throws: summary.throwsUsed,
+        combo: summary.bestCombo,
+      });
+    }
+
     this.publish();
     bus.emit('state', next);
-    const win = next === 'LEVEL_COMPLETE';
+    const nextId = mode === 'campaign' && win ? nextLevelId(level.id, store.data.pro) : undefined;
     this.after(450, () => {
       if (win) sfx.win();
       else sfx.lose();
       bus.emit('tutorial', { step: -1 });
       bus.emit('result', {
-        summary,
-        levelId,
+        summary: endless ? { ...summary, score: endless.total } : summary,
+        mode,
+        levelId: level.id,
+        name: level.name,
         newRecord,
         bestStars,
-        hasNext: r.mode === 'campaign' && win && levelId < 5,
+        hasNext: nextId !== undefined,
         dailyBest,
+        endless,
+        editorTest: this.req.editorTest,
+        botLevel: mode === 'duel' ? this.ctx.botLevel : undefined,
+        challenge:
+          mode === 'custom'
+            ? { code: this.req.code, friendName: this.req.challengeName, friendScore: this.req.challengeScore }
+            : this.req.challengeScore !== undefined
+              ? { friendName: this.req.challengeName, friendScore: this.req.challengeScore }
+              : undefined,
+        coins: this.coinsEarned,
       });
     });
   }
@@ -608,14 +933,18 @@ export class GameScene extends Phaser.Scene {
       ? {
           mode: r.mode,
           levelId: this.level?.id ?? 0,
-          score: r.score,
-          throwsLeft: r.mode === 'versus' ? r.versusThrowsLeft(0) + r.versusThrowsLeft(1) : r.throwsLeft,
+          name: this.level?.name,
+          score: r.mode === 'endless' ? this.ctx.totalScore + r.score : r.score,
+          throwsLeft: r.isVersus ? r.versusThrowsLeft(0) + r.versusThrowsLeft(1) : r.throwsLeft,
           throwsTotal: r.throwsAllowed,
           asyksLeft: r.asyksLeft,
           asykTotal: r.asykTotal,
           player: r.player,
           scores: [r.scores[0], r.scores[1]],
           versusLeft: [r.versusThrowsLeft(0), r.versusThrowsLeft(1)],
+          wave: r.mode === 'endless' ? this.ctx.wave : undefined,
+          botLevel: r.mode === 'duel' ? this.ctx.botLevel : undefined,
+          botThinking: this.botThinking || this.botAim !== null,
           showHint: !this.firstThrow && !this.tutorial,
         }
       : {
@@ -658,6 +987,7 @@ export class GameScene extends Phaser.Scene {
     let z = this.depth.z(sb.id, this.nowMs);
     let alpha = 1;
     let scale = 1;
+    let hlMul = 1;
     if (sb.kind === 'asyk' && sb.scored) {
       // вылет и исчезновение (~OUT_FADE_MS)
       const u = Math.min(1, ((this.sim!.tick - sb.scoredTick) * STEP_MS) / OUT_FADE_MS);
@@ -669,7 +999,8 @@ export class GameScene extends Phaser.Scene {
       z = Math.max(z, DepthTracker.flightZ(sb.body.speed, MAX_BODY_SPEED));
       if (this.sakaFade >= 0) alpha = 0.55;
     }
-    this.place(sp, p.x, p.y, sb.body.angle, z, alpha, scale, f);
+    if (sb.type === 'golden') hlMul = 0.7 + 0.3 * Math.sin(this.nowMs / 210 + p.x * 0.05); // мерцание
+    this.place(sp, p.x, p.y, sb.body.angle, z, alpha, scale, f, hlMul);
   }
 
   // ------------------------------------------------------------------ прицел (плоский, не искажается параллаксом)
@@ -681,13 +1012,16 @@ export class GameScene extends Phaser.Scene {
       this.powerText.setVisible(false);
       return;
     }
+    const botTurn = r.mode === 'duel' && r.player === 1;
     // линия броска и зона касания
-    g.fillStyle(0xf6ecd0, 0.06);
-    g.fillRect(0, AIM_ZONE_Y, FIELD_W, FIELD_H - AIM_ZONE_Y);
+    if (!botTurn) {
+      g.fillStyle(0xf6ecd0, 0.06);
+      g.fillRect(0, AIM_ZONE_Y, FIELD_W, FIELD_H - AIM_ZONE_Y);
+    }
     g.lineStyle(3, 0x16a5a3, 0.55);
     for (let x = 30; x < FIELD_W - 30; x += 28) g.lineBetween(x, THROW_LINE_Y + 34, x + 16, THROW_LINE_Y + 34);
 
-    const a = this.aim.state;
+    const a = this.aimState();
     const p0 = this.idlePos;
     if (!a.active) {
       // покой: сақа на линии, лёгкое «дыхание»
@@ -719,8 +1053,17 @@ export class GameScene extends Phaser.Scene {
     }
     this.powerText.setVisible(a.valid || a.mode === 'keys').setPosition(p0.x, p0.y + 84).setText(`${Math.round(power * 100)}%`).setColor('#ffffff');
 
-    // пунктир направления: длина зависит от силы (полную траекторию не рисуем)
     if (a.valid || a.mode === 'keys') {
+      // «Лёгкий» режим: длинная направляющая с грубой дальностью (v / frictionAir)
+      if (store.data.difficulty === 'easy' && !botTurn) {
+        const v = POWER_MIN + (POWER_MAX - POWER_MIN) * power;
+        const reach = Math.min(v / SAKA.frictionAir, 1000);
+        g.fillStyle(0xf6ecd0, 0.55);
+        for (let d = 90; d < reach; d += 24) g.fillCircle(p0.x + a.dirX * d, p0.y + a.dirY * d, 3);
+        g.lineStyle(3, 0xf6ecd0, 0.7);
+        g.strokeCircle(p0.x + a.dirX * reach, p0.y + a.dirY * reach, 16);
+      }
+      // пунктир направления: длина зависит от силы (полную траекторию не рисуем)
       const start = 70;
       const len = 60 + power * 240;
       g.lineStyle(6, col, 0.95);
@@ -744,4 +1087,12 @@ export class GameScene extends Phaser.Scene {
       g.fillCircle(a.cx, a.cy, 8);
     }
   }
+}
+
+interface ResultDataEndless {
+  wave: number;
+  total: number;
+  best: number;
+  newBest: boolean;
+  runSeed: number;
 }

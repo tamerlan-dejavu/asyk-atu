@@ -1,7 +1,17 @@
 import type Phaser from 'phaser';
-import { ASYK, FIELD_H, FIELD_W, SAKA } from '../config';
+import { ASYK, BLOCK, FIELD_H, FIELD_W, SAKA } from '../config';
 import { bonePolygon } from '../physics/bodies';
 import { mulberry32 } from '../levels/rng';
+import {
+  asykPal,
+  GOLDEN_PAL,
+  HEAVY_PAL,
+  sakaPal,
+  themePal,
+  type AsykPal,
+  type SakaPal,
+  type ThemePal,
+} from './looks';
 
 /** Поля вокруг слоёв параллакса, чтобы при сдвиге не открывались края. */
 export const LAYER_MARGIN = 24;
@@ -21,11 +31,16 @@ export const PAL = {
   turquoiseDark: '#0e7f7d',
 };
 
+/** Рисует в текстуру-холст; при повторном вызове перерисовывает существующую (без пересоздания). */
 function bake(scene: Phaser.Scene, key: string, w: number, h: number, S: number, draw: (ctx: Ctx) => void): void {
-  if (scene.textures.exists(key)) scene.textures.remove(key);
-  const tex = scene.textures.createCanvas(key, Math.ceil(w * S), Math.ceil(h * S));
+  const cw = Math.ceil(w * S);
+  const ch = Math.ceil(h * S);
+  let tex = scene.textures.exists(key) ? (scene.textures.get(key) as Phaser.Textures.CanvasTexture) : null;
+  if (!tex) tex = scene.textures.createCanvas(key, cw, ch);
   if (!tex) return;
   const ctx = tex.getContext();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cw, ch);
   ctx.scale(S, S);
   draw(ctx);
   tex.refresh();
@@ -44,11 +59,11 @@ function polyPath(ctx: Ctx, pts: { x: number; y: number }[], cx: number, cy: num
 }
 
 // ---------------------------------------------------------------- земля
-function drawGround(ctx: Ctx, w: number, h: number): void {
+function drawGround(ctx: Ctx, w: number, h: number, th: ThemePal): void {
   const rnd = mulberry32(7);
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#cf9f62');
-  g.addColorStop(1, '#bb8544');
+  g.addColorStop(0, th.ground[0]);
+  g.addColorStop(1, th.ground[1]);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   // крупные пятна
@@ -58,7 +73,7 @@ function drawGround(ctx: Ctx, w: number, h: number): void {
     const r = 40 + rnd() * 110;
     const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
     const dark = rnd() > 0.5;
-    rg.addColorStop(0, dark ? 'rgba(120,70,30,0.10)' : 'rgba(255,225,170,0.10)');
+    rg.addColorStop(0, dark ? th.blotDark : th.blotLight);
     rg.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = rg;
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
@@ -68,7 +83,7 @@ function drawGround(ctx: Ctx, w: number, h: number): void {
     const x = rnd() * w;
     const y = rnd() * h;
     const s = 0.8 + rnd() * 2.2;
-    ctx.fillStyle = rnd() > 0.5 ? `rgba(110,65,28,${0.10 + rnd() * 0.25})` : `rgba(255,232,188,${0.10 + rnd() * 0.25})`;
+    ctx.fillStyle = rnd() > 0.5 ? `rgba(${th.speckDark},${0.1 + rnd() * 0.25})` : `rgba(${th.speckLight},${0.1 + rnd() * 0.25})`;
     ctx.beginPath();
     ctx.ellipse(x, y, s, s * 0.7, rnd() * 3, 0, Math.PI * 2);
     ctx.fill();
@@ -78,7 +93,7 @@ function drawGround(ctx: Ctx, w: number, h: number): void {
   for (let i = 0; i < 90; i++) {
     const x = rnd() * w;
     const y = rnd() * h;
-    ctx.strokeStyle = `rgba(105,110,45,${0.35 + rnd() * 0.3})`;
+    ctx.strokeStyle = `rgba(${th.grass},${0.35 + rnd() * 0.3})`;
     ctx.lineWidth = 1.2;
     for (let k = 0; k < 4; k++) {
       ctx.beginPath();
@@ -88,7 +103,7 @@ function drawGround(ctx: Ctx, w: number, h: number): void {
     }
   }
   // следы на земле
-  ctx.strokeStyle = 'rgba(120,75,35,0.10)';
+  ctx.strokeStyle = `rgba(${th.speckDark},0.10)`;
   ctx.lineWidth = 3;
   for (let i = 0; i < 6; i++) {
     ctx.beginPath();
@@ -100,41 +115,58 @@ function drawGround(ctx: Ctx, w: number, h: number): void {
 }
 
 // ---------------------------------------------------------------- дальний план
-function drawFar(ctx: Ctx, w: number, h: number): void {
+function drawFar(ctx: Ctx, w: number, h: number, th: ThemePal): void {
   const sky = ctx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, '#f2d9a4');
-  sky.addColorStop(0.7, '#e9c68c');
-  sky.addColorStop(1, '#d9ad72');
+  sky.addColorStop(0, th.sky[0]);
+  sky.addColorStop(0.7, th.sky[1]);
+  sky.addColorStop(1, th.sky[2]);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, w, h);
+  if (th.night) {
+    const rnd = mulberry32(3);
+    ctx.fillStyle = 'rgba(255,255,240,0.9)';
+    for (let i = 0; i < 46; i++) {
+      ctx.beginPath();
+      ctx.arc(rnd() * w, rnd() * (h - 60), 0.7 + rnd() * 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#f3ecc0';
+    ctx.beginPath();
+    ctx.arc(150, 62, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = th.sky[0];
+    ctx.beginPath();
+    ctx.arc(158, 57, 18, 0, Math.PI * 2);
+    ctx.fill();
+  }
   // холмы
-  ctx.fillStyle = '#c9a26a';
+  ctx.fillStyle = th.hill[0];
   ctx.beginPath();
   ctx.ellipse(120, h - 8, 260, 46, 0, Math.PI, 0);
   ctx.ellipse(560, h - 8, 300, 38, 0, Math.PI, 0);
   ctx.fill();
-  ctx.fillStyle = '#b48a50';
+  ctx.fillStyle = th.hill[1];
   ctx.beginPath();
   ctx.ellipse(380, h - 4, 340, 26, 0, Math.PI, 0);
   ctx.fill();
   // деревья
   const rnd = mulberry32(21);
   for (const tx of [60, 110, 250, 320, 690, 740]) {
-    const th = 34 + rnd() * 22;
-    ctx.fillStyle = '#5a4526';
-    ctx.fillRect(tx - 2, h - 26 - th * 0.5, 4, th * 0.6);
-    ctx.fillStyle = '#6f6a34';
+    const tH = 34 + rnd() * 22;
+    ctx.fillStyle = th.trunk;
+    ctx.fillRect(tx - 2, h - 26 - tH * 0.5, 4, tH * 0.6);
+    ctx.fillStyle = th.crown;
     ctx.beginPath();
-    ctx.arc(tx, h - 28 - th * 0.55, th * 0.42, 0, Math.PI * 2);
-    ctx.arc(tx - 9, h - 22 - th * 0.4, th * 0.3, 0, Math.PI * 2);
-    ctx.arc(tx + 9, h - 22 - th * 0.4, th * 0.3, 0, Math.PI * 2);
+    ctx.arc(tx, h - 28 - tH * 0.55, tH * 0.42, 0, Math.PI * 2);
+    ctx.arc(tx - 9, h - 22 - tH * 0.4, tH * 0.3, 0, Math.PI * 2);
+    ctx.arc(tx + 9, h - 22 - tH * 0.4, tH * 0.3, 0, Math.PI * 2);
     ctx.fill();
   }
   // юрта
   const yx = 520;
   const yb = h - 18;
-  ctx.fillStyle = '#efe1bd';
-  ctx.strokeStyle = '#6b4a2a';
+  ctx.fillStyle = th.night ? '#c9c2a8' : '#efe1bd';
+  ctx.strokeStyle = th.night ? '#2a2f44' : '#6b4a2a';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.rect(yx - 44, yb - 26, 88, 26);
@@ -156,14 +188,14 @@ function drawFar(ctx: Ctx, w: number, h: number): void {
     ctx.lineTo(yx + i * 12, yb);
     ctx.stroke();
   }
-  ctx.fillStyle = '#5a3520';
+  ctx.fillStyle = th.night ? '#f2c230' : '#5a3520';
   ctx.fillRect(yx - 8, yb - 22, 16, 22);
   ctx.fillStyle = '#6b4a2a';
   ctx.beginPath();
   ctx.arc(yx, yb - 60, 5, 0, Math.PI * 2);
   ctx.fill();
   // забор
-  ctx.strokeStyle = '#6a4526';
+  ctx.strokeStyle = th.fence;
   ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.moveTo(0, h - 22);
@@ -178,12 +210,40 @@ function drawFar(ctx: Ctx, w: number, h: number): void {
     ctx.lineTo(x, h - 4);
     ctx.stroke();
   }
+  if (th.bunting) {
+    // гирлянда флажков — праздник «той»
+    const colors = ['#b03a2e', '#f2c230', '#16a5a3', '#f6ecd0', '#e5482f'];
+    ctx.strokeStyle = '#5a3520';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 22);
+    ctx.quadraticCurveTo(w / 2, 62, w, 22);
+    ctx.stroke();
+    for (let i = 1; i < 26; i++) {
+      const t = i / 26;
+      const x = t * w;
+      const y = 22 + 4 * t * (1 - t) * 40 * 0.98;
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.beginPath();
+      ctx.moveTo(x - 7, y);
+      ctx.lineTo(x + 7, y);
+      ctx.lineTo(x, y + 15);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
   // плавный переход в землю
+  const [gr, gg, gb] = hexToRgb(th.ground[0]);
   const fade = ctx.createLinearGradient(0, h - 14, 0, h);
-  fade.addColorStop(0, 'rgba(200,151,90,0)');
-  fade.addColorStop(1, 'rgba(200,151,90,1)');
+  fade.addColorStop(0, `rgba(${gr},${gg},${gb},0)`);
+  fade.addColorStop(1, `rgba(${gr},${gg},${gb},1)`);
   ctx.fillStyle = fade;
   ctx.fillRect(0, h - 14, w, 14);
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
 // ---------------------------------------------------------------- «қошқар мүйіз» (рога барана), упрощённо
@@ -206,12 +266,12 @@ export function ramHorn(ctx: Ctx, x: number, y: number, s: number, flip: number,
 }
 
 // ---------------------------------------------------------------- ближний план и рамка
-function drawNear(ctx: Ctx, w: number, h: number): void {
+function drawNear(ctx: Ctx, w: number, h: number, th: ThemePal): void {
   const m = LAYER_MARGIN;
   // мягкая виньетка
   const vg = ctx.createRadialGradient(w / 2, h / 2, h * 0.32, w / 2, h / 2, h * 0.72);
-  vg.addColorStop(0, 'rgba(60,30,10,0)');
-  vg.addColorStop(1, 'rgba(60,30,10,0.28)');
+  vg.addColorStop(0, `rgba(${th.vignette},0)`);
+  vg.addColorStop(1, `rgba(${th.vignette},0.28)`);
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, w, h);
   // камешки и травинки у нижнего края
@@ -233,7 +293,7 @@ function drawNear(ctx: Ctx, w: number, h: number): void {
   for (let i = 0; i < 24; i++) {
     const x = m + 20 + rnd() * (FIELD_W - 40);
     const y = h - m - 14 - rnd() * 26;
-    ctx.strokeStyle = 'rgba(96,104,44,0.85)';
+    ctx.strokeStyle = `rgba(${th.grass},0.85)`;
     ctx.lineWidth = 1.6;
     for (let k = 0; k < 5; k++) {
       ctx.beginPath();
@@ -248,17 +308,17 @@ function drawNear(ctx: Ctx, w: number, h: number): void {
   const fw = FIELD_W + 12;
   const fh = FIELD_H + 12;
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = PAL.terracotta;
+  ctx.strokeStyle = th.frame;
   ctx.lineWidth = 18;
   ctx.strokeRect(x0 + 2, y0 + 2, fw - 4, fh - 4);
-  ctx.strokeStyle = PAL.cream;
+  ctx.strokeStyle = th.frameLine;
   ctx.lineWidth = 2;
   ctx.strokeRect(x0 + 12, y0 + 12, fw - 24, fh - 24);
   ctx.strokeStyle = PAL.brown;
   ctx.lineWidth = 2;
   ctx.strokeRect(x0 - 6.5, y0 - 6.5, fw + 13, fh + 13);
   // ромбы вдоль рамки
-  ctx.fillStyle = PAL.turquoise;
+  ctx.fillStyle = th.frameDots;
   const diamond = (cx: number, cy: number) => {
     ctx.beginPath();
     ctx.moveTo(cx, cy - 5);
@@ -281,7 +341,7 @@ function drawNear(ctx: Ctx, w: number, h: number): void {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(fx, fy);
-    ramHorn(ctx, 4, 4, 1.4, 1, PAL.cream);
+    ramHorn(ctx, 4, 4, 1.4, 1, th.frameLine);
     ctx.restore();
   };
   corner(x0 + 12, y0 + 12, 1, 1);
@@ -342,33 +402,65 @@ function drawZone(ctx: Ctx, size: number, r: number): void {
 }
 
 // ---------------------------------------------------------------- тела
-function drawAsyk(ctx: Ctx, w: number, h: number): void {
+type BoneKind = 'normal' | 'golden' | 'heavy';
+
+function drawAsyk(ctx: Ctx, w: number, h: number, pal: AsykPal, kind: BoneKind): void {
   const cx = w / 2;
   const cy = h / 2;
   const pts = bonePolygon(ASYK.w, ASYK.h);
   const g = ctx.createLinearGradient(cx - ASYK.w / 2, cy - ASYK.h / 2, cx + ASYK.w / 2, cy + ASYK.h / 2);
-  g.addColorStop(0, '#fffaf0');
-  g.addColorStop(0.5, '#efe0b8');
-  g.addColorStop(1, '#c4a56c');
+  g.addColorStop(0, pal.light);
+  g.addColorStop(0.5, pal.mid);
+  g.addColorStop(1, pal.dark);
   polyPath(ctx, pts, cx, cy);
   ctx.fillStyle = g;
   ctx.fill();
-  // прожилки кости
   ctx.save();
   polyPath(ctx, pts, cx, cy);
   ctx.clip();
-  ctx.strokeStyle = 'rgba(139,105,58,0.35)';
-  ctx.lineWidth = 0.9;
-  const rnd = mulberry32(5);
-  for (let i = 0; i < 7; i++) {
-    const y = cy + (rnd() - 0.5) * ASYK.h * 0.8;
+  if (kind === 'heavy') {
+    // металлическая полоса
+    const mg = ctx.createLinearGradient(0, cy - 5, 0, cy + 5);
+    mg.addColorStop(0, '#f0ede6');
+    mg.addColorStop(0.5, '#8d877c');
+    mg.addColorStop(1, '#2a2620');
+    ctx.fillStyle = mg;
+    ctx.fillRect(cx - ASYK.w / 2, cy - 4.5, ASYK.w, 9);
+    ctx.fillStyle = '#16a5a3';
+    for (const dx of [-12, 0, 12]) {
+      ctx.beginPath();
+      ctx.arc(cx + dx, cy, 1.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    // прожилки кости
+    ctx.strokeStyle = pal.vein;
+    ctx.lineWidth = 0.9;
+    const rnd = mulberry32(5);
+    for (let i = 0; i < 7; i++) {
+      const y = cy + (rnd() - 0.5) * ASYK.h * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(cx - ASYK.w / 2, y + (rnd() - 0.5) * 4);
+      ctx.bezierCurveTo(cx - 8, y + (rnd() - 0.5) * 6, cx + 8, y + (rnd() - 0.5) * 6, cx + ASYK.w / 2, y + (rnd() - 0.5) * 4);
+      ctx.stroke();
+    }
+  }
+  if (kind === 'golden') {
+    // четырёхлучевая искра
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.beginPath();
-    ctx.moveTo(cx - ASYK.w / 2, y + (rnd() - 0.5) * 4);
-    ctx.bezierCurveTo(cx - 8, y + (rnd() - 0.5) * 6, cx + 8, y + (rnd() - 0.5) * 6, cx + ASYK.w / 2, y + (rnd() - 0.5) * 4);
-    ctx.stroke();
+    ctx.moveTo(cx + 7, cy - 8);
+    ctx.lineTo(cx + 9, cy - 3);
+    ctx.lineTo(cx + 14, cy - 1);
+    ctx.lineTo(cx + 9, cy + 1);
+    ctx.lineTo(cx + 7, cy + 6);
+    ctx.lineTo(cx + 5, cy + 1);
+    ctx.lineTo(cx, cy - 1);
+    ctx.lineTo(cx + 5, cy - 3);
+    ctx.closePath();
+    ctx.fill();
   }
   ctx.restore();
-  // фаска: светлая кромка сверху-слева, тёмная снизу-справа
   ctx.save();
   polyPath(ctx, pts, cx, cy, -2.4);
   ctx.lineWidth = 1.6;
@@ -377,34 +469,100 @@ function drawAsyk(ctx: Ctx, w: number, h: number): void {
   ctx.restore();
   polyPath(ctx, pts, cx, cy);
   ctx.lineWidth = 2;
-  ctx.strokeStyle = '#4b3018';
+  ctx.strokeStyle = pal.outline;
   ctx.lineJoin = 'round';
   ctx.stroke();
 }
 
-function drawSaka(ctx: Ctx, w: number, h: number): void {
+function drawBlock(ctx: Ctx, w: number, h: number): void {
+  const cx = w / 2;
+  const cy = h / 2;
+  const s = BLOCK.size;
+  const x = cx - s / 2;
+  const y = cy - s / 2;
+  const rr = (r: number, grow = 0) => {
+    ctx.beginPath();
+    ctx.roundRect(x - grow, y - grow, s + grow * 2, s + grow * 2, r);
+  };
+  const g = ctx.createLinearGradient(x, y, x + s, y + s);
+  g.addColorStop(0, '#b8ada0');
+  g.addColorStop(0.5, '#8a8074');
+  g.addColorStop(1, '#4e463d');
+  rr(BLOCK.radius);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.save();
+  rr(BLOCK.radius);
+  ctx.clip();
+  // орнамент: ромб «қошқар мүйіз»
+  ctx.strokeStyle = 'rgba(246,236,208,0.55)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 12);
+  ctx.lineTo(cx + 12, cy);
+  ctx.lineTo(cx, cy + 12);
+  ctx.lineTo(cx - 12, cy);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle = PAL.turquoise;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  for (const [dx, dy] of [[-12, 8], [10, -13], [14, 12]]) ctx.fillRect(cx + dx, cy + dy, 3, 2);
+  ctx.restore();
+  rr(BLOCK.radius, -2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  rr(BLOCK.radius);
+  ctx.strokeStyle = '#231d17';
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+}
+
+function drawSaka(ctx: Ctx, w: number, h: number, pal: SakaPal): void {
   const cx = w / 2;
   const cy = h / 2;
   const pts = bonePolygon(SAKA.w, SAKA.h);
   const g = ctx.createLinearGradient(cx - SAKA.w / 2, cy - SAKA.h / 2, cx + SAKA.w / 2, cy + SAKA.h / 2);
-  g.addColorStop(0, '#e7edf2');
-  g.addColorStop(0.35, '#98a5b3');
-  g.addColorStop(0.7, '#4c5866');
-  g.addColorStop(1, '#232b33');
+  g.addColorStop(0, pal.c[0]);
+  g.addColorStop(0.35, pal.c[1]);
+  g.addColorStop(0.7, pal.c[2]);
+  g.addColorStop(1, pal.c[3]);
   polyPath(ctx, pts, cx, cy);
   ctx.fillStyle = g;
   ctx.fill();
-  // бирюзовая инкрустация вдоль оси
   ctx.save();
   polyPath(ctx, pts, cx, cy);
   ctx.clip();
-  ctx.strokeStyle = PAL.turquoise;
+  if (pal.ornament) {
+    // орнамент «оюлы»: ряд ромбов вдоль оси
+    ctx.fillStyle = 'rgba(246,236,208,0.28)';
+    for (let i = -3; i <= 3; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * 9, cy - 11);
+      ctx.lineTo(cx + i * 9 + 5, cy - 6);
+      ctx.lineTo(cx + i * 9, cy - 1);
+      ctx.lineTo(cx + i * 9 - 5, cy - 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx + i * 9, cy + 11);
+      ctx.lineTo(cx + i * 9 + 5, cy + 6);
+      ctx.lineTo(cx + i * 9, cy + 1);
+      ctx.lineTo(cx + i * 9 - 5, cy + 6);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.strokeStyle = pal.inlay;
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(cx - SAKA.w / 2 + 10, cy);
   ctx.lineTo(cx + SAKA.w / 2 - 10, cy);
   ctx.stroke();
-  ctx.fillStyle = PAL.turquoise;
+  ctx.fillStyle = pal.inlay;
   for (const dx of [-14, 0, 14]) {
     ctx.beginPath();
     ctx.arc(cx + dx, cy, 3.6, 0, Math.PI * 2);
@@ -417,15 +575,22 @@ function drawSaka(ctx: Ctx, w: number, h: number): void {
   ctx.stroke();
   polyPath(ctx, pts, cx, cy);
   ctx.lineWidth = 2.4;
-  ctx.strokeStyle = '#11171c';
+  ctx.strokeStyle = pal.outline;
   ctx.lineJoin = 'round';
   ctx.stroke();
 }
 
-function drawShadow(ctx: Ctx, w: number, h: number, bw: number, bh: number): void {
+function drawShadow(ctx: Ctx, w: number, h: number, bw: number, bh: number, rect = false): void {
   const cx = w / 2;
   const cy = h / 2;
-  const pts = bonePolygon(bw, bh);
+  const pts = rect
+    ? [
+        { x: -bw / 2, y: -bh / 2 },
+        { x: bw / 2, y: -bh / 2 },
+        { x: bw / 2, y: bh / 2 },
+        { x: -bw / 2, y: bh / 2 },
+      ]
+    : bonePolygon(bw, bh);
   ctx.lineJoin = 'round';
   for (let r = 14; r >= 1; r--) {
     polyPath(ctx, pts, cx, cy);
@@ -473,35 +638,52 @@ function drawSimpleShadow(ctx: Ctx, w: number, h: number): void {
   ctx.fill();
 }
 
-export interface TexSizes {
-  asyk: { w: number; h: number };
-  saka: { w: number; h: number };
-  shadowAsyk: { w: number; h: number };
-  shadowSaka: { w: number; h: number };
+export interface TexSize {
+  w: number;
+  h: number;
 }
 
-export const TEX: TexSizes = {
+export const TEX = {
   asyk: { w: ASYK.w + PAD * 2, h: ASYK.h + PAD * 2 },
   saka: { w: SAKA.w + PAD * 2, h: SAKA.h + PAD * 2 },
+  block: { w: BLOCK.size + PAD * 2, h: BLOCK.size + PAD * 2 },
   shadowAsyk: { w: ASYK.w + 44, h: ASYK.h + 44 },
   shadowSaka: { w: SAKA.w + 44, h: SAKA.h + 44 },
+  shadowBlock: { w: BLOCK.size + 44, h: BLOCK.size + 44 },
 };
 
-/** Запекает ВСЕ текстуры один раз при загрузке: никаких пост-эффектов и размытия в рантайме. */
-export function bakeAll(scene: Phaser.Scene, S: number, zoneR: number): void {
+export interface Look {
+  saka: string;
+  theme: string;
+  asyk: string;
+}
+
+/** Текстуры, зависящие от оформления (косметика). Можно перепекать без пересоздания спрайтов. */
+export function bakeLook(scene: Phaser.Scene, S: number, look: Look): void {
+  const th = themePal(look.theme);
   const gw = FIELD_W + LAYER_MARGIN * 2;
   const gh = FIELD_H + LAYER_MARGIN * 2;
-  bake(scene, 'ground', gw, gh, S, (c) => drawGround(c, gw, gh));
-  bake(scene, 'far', gw, FAR_H, S, (c) => drawFar(c, gw, FAR_H));
-  bake(scene, 'near', gw, gh, S, (c) => drawNear(c, gw, gh));
+  bake(scene, 'ground', gw, gh, S, (c) => drawGround(c, gw, gh, th));
+  bake(scene, 'far', gw, FAR_H, S, (c) => drawFar(c, gw, FAR_H, th));
+  bake(scene, 'near', gw, gh, S, (c) => drawNear(c, gw, gh, th));
+  bake(scene, 'saka', TEX.saka.w, TEX.saka.h, S, (c) => drawSaka(c, TEX.saka.w, TEX.saka.h, sakaPal(look.saka)));
+  bake(scene, 'asyk', TEX.asyk.w, TEX.asyk.h, S, (c) => drawAsyk(c, TEX.asyk.w, TEX.asyk.h, asykPal(look.asyk), 'normal'));
+}
+
+/** Запекает ВСЕ текстуры один раз при загрузке: никаких пост-эффектов и размытия в рантайме. */
+export function bakeAll(scene: Phaser.Scene, S: number, zoneR: number, look: Look): void {
+  bakeLook(scene, S, look);
   const zs = (zoneR + 24) * 2;
   bake(scene, 'zone', zs, zs, S, (c) => drawZone(c, zs, zoneR));
-  bake(scene, 'asyk', TEX.asyk.w, TEX.asyk.h, S, (c) => drawAsyk(c, TEX.asyk.w, TEX.asyk.h));
-  bake(scene, 'saka', TEX.saka.w, TEX.saka.h, S, (c) => drawSaka(c, TEX.saka.w, TEX.saka.h));
+  bake(scene, 'asykGolden', TEX.asyk.w, TEX.asyk.h, S, (c) => drawAsyk(c, TEX.asyk.w, TEX.asyk.h, GOLDEN_PAL, 'golden'));
+  bake(scene, 'asykHeavy', TEX.asyk.w, TEX.asyk.h, S, (c) => drawAsyk(c, TEX.asyk.w, TEX.asyk.h, HEAVY_PAL, 'heavy'));
+  bake(scene, 'block', TEX.block.w, TEX.block.h, S, (c) => drawBlock(c, TEX.block.w, TEX.block.h));
   bake(scene, 'shadowAsyk', TEX.shadowAsyk.w, TEX.shadowAsyk.h, S, (c) => drawShadow(c, TEX.shadowAsyk.w, TEX.shadowAsyk.h, ASYK.w, ASYK.h));
   bake(scene, 'shadowSaka', TEX.shadowSaka.w, TEX.shadowSaka.h, S, (c) => drawShadow(c, TEX.shadowSaka.w, TEX.shadowSaka.h, SAKA.w, SAKA.h));
+  bake(scene, 'shadowBlock', TEX.shadowBlock.w, TEX.shadowBlock.h, S, (c) => drawShadow(c, TEX.shadowBlock.w, TEX.shadowBlock.h, BLOCK.size, BLOCK.size, true));
   bake(scene, 'simpleShadowAsyk', ASYK.w, ASYK.h, S, (c) => drawSimpleShadow(c, ASYK.w, ASYK.h));
   bake(scene, 'simpleShadowSaka', SAKA.w, SAKA.h, S, (c) => drawSimpleShadow(c, SAKA.w, SAKA.h));
+  bake(scene, 'simpleShadowBlock', BLOCK.size, BLOCK.size, S, (c) => drawSimpleShadow(c, BLOCK.size, BLOCK.size));
   bake(scene, 'hlAsyk', 22, 16, S, (c) => drawHighlight(c, 22, 16, false));
   bake(scene, 'hlSaka', 30, 20, S, (c) => drawHighlight(c, 30, 20, true));
   bake(scene, 'dust', 32, 32, S, (c) => drawDust(c, 32));

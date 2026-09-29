@@ -1,6 +1,6 @@
 import { DAILY_THROWS, ZONE } from '../config';
-import type { AsykSpec, LevelDef } from '../../types';
-import { asykGap, insideZone } from './layout';
+import type { LevelDef } from '../../types';
+import { generateLayout } from './generate';
 import { hashString, mulberry32 } from './rng';
 
 /** Локальная дата YYYY-MM-DD. */
@@ -10,21 +10,21 @@ export function dateKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-const MIN_GAP = 6;
+/** Проверка формата ключа даты (для ссылок-вызовов). */
+export function isDateKey(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
 
 /** Ежедневное испытание: 6 асыков, положение/угол из mulberry32(дата). Одинаково на всех устройствах. */
 export function dailyLevel(key: string = dateKey()): LevelDef {
   const rnd = mulberry32(hashString(`asyk-atu:${key}`));
   const zone = { ...ZONE };
-  const asyks: AsykSpec[] = [];
-  let guard = 0;
-  while (asyks.length < 6 && guard++ < 5000) {
-    const rr = Math.sqrt(rnd()) * (zone.r - 40);
-    const th = rnd() * Math.PI * 2;
-    const cand: AsykSpec = { x: zone.x + Math.cos(th) * rr, y: zone.y + Math.sin(th) * rr, angle: rnd() * Math.PI };
-    if (!insideZone(cand, zone, 6)) continue;
-    if (asyks.some((a) => asykGap(a, cand) < MIN_GAP)) continue;
-    asyks.push(cand);
-  }
-  return { id: 200, nameKey: 'daily', throws: DAILY_THROWS, par: null, zone, asyks };
+  return {
+    id: 200,
+    nameKey: 'daily',
+    throws: DAILY_THROWS,
+    par: null,
+    zone,
+    asyks: generateLayout(rnd, { zone, count: 6, gap: 6 }),
+  };
 }

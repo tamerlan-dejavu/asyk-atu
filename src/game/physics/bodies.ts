@@ -1,4 +1,5 @@
-import { ASYK, FIELD_H, FIELD_W, SAKA, WALL_RESTITUTION } from '../config';
+import { ASYK, BLOCK, FIELD_H, FIELD_W, HEAVY, SAKA, WALL_RESTITUTION } from '../config';
+import type { AsykType } from '../../types';
 
 // Matter.js не имеет типов в сборке Phaser — работаем через минимальный any.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,7 +22,25 @@ export function bonePolygon(w: number, h: number): { x: number; y: number }[] {
   ];
 }
 
-export function createAsykBody(M: MatterNS, label: string, x: number, y: number, angle: number): MBody {
+export function createAsykBody(
+  M: MatterNS,
+  label: string,
+  x: number,
+  y: number,
+  angle: number,
+  type: AsykType = 'normal',
+): MBody {
+  if (type === 'block') {
+    return M.Bodies.rectangle(x, y, BLOCK.size, BLOCK.size, {
+      label,
+      angle,
+      isStatic: true,
+      restitution: BLOCK.restitution,
+      friction: 0.3,
+      chamfer: { radius: BLOCK.radius },
+    });
+  }
+  const heavy = type === 'heavy';
   return M.Bodies.fromVertices(
     x,
     y,
@@ -29,10 +48,10 @@ export function createAsykBody(M: MatterNS, label: string, x: number, y: number,
     {
       label,
       angle,
-      density: ASYK.density,
+      density: ASYK.density * (heavy ? HEAVY.densityMul : 1),
       friction: ASYK.friction,
       restitution: ASYK.restitution,
-      frictionAir: ASYK.frictionAir,
+      frictionAir: ASYK.frictionAir * (heavy ? HEAVY.frictionAirMul : 1),
       frictionStatic: 0.5,
       sleepThreshold: Infinity,
     },

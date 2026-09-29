@@ -22,6 +22,16 @@ export const kk: Dict = {
   level3: 'Қабырға', // verify: native speaker
   level4: 'Шеңбер', // verify: native speaker
   level5: 'Шашыранды', // verify: native speaker
+  level6: 'Қорғалған алтын', // verify: native speaker
+  level7: 'Ауыр қатар', // verify: native speaker
+  level8: 'Тас қалқан', // verify: native speaker
+  level9: 'Аралас шеңбер', // verify: native speaker
+  level10: 'Дала финалы', // verify: native speaker
+  level11: "Алтын шашу", // verify: native speaker
+  level12: "Темір қатар", // verify: native speaker
+  level13: "Тастар арасындағы жол", // verify: native speaker
+  level14: "Үлкен той", // verify: native speaker
+  level15: "Хан алтыны", // verify: native speaker
   levelN: '{n}-сынақ', // verify: native speaker
   best: 'Рекорд', // verify: native speaker
   locked: 'Жабық', // verify: native speaker
@@ -117,4 +127,164 @@ export const kk: Dict = {
   qualityHint: 'Төмен сапа параллаксты, секіруді және жұмсақ көлеңкені өшіреді', // verify: native speaker
   mute: 'Дыбыс', // verify: native speaker
   rotate: 'Құрылғыны тігінен бұр', // verify: native speaker
+  badLink: 'Сілтеме бүлінген немесе жарамсыз', // verify: native speaker
+  waveN: '{n}-толқын', // verify: native speaker
+  continue: 'Жалғастыру', // verify: native speaker
+  continueInfo: '{name} · {score} ұп.', // verify: native speaker
+  modes: 'Режимдер', // verify: native speaker
+  modesTitle: 'Ойын режимдері', // verify: native speaker
+  modeVersusDesc: 'Екі ойыншы, бір экран', // verify: native speaker
+  modeDuelDesc: 'Үш деңгейлі ботпен күрес', // verify: native speaker
+  modeEndlessDesc: 'Лақтыру жеткенше толқындар өседі', // verify: native speaker
+  modeDailyDesc: 'Бүгін бәріне бір орналасу', // verify: native speaker
+  modeEditorDesc: 'Тапсырма құрып, досыңа жібер', // verify: native speaker
+  modeMineDesc: 'Сақталған сынақтарың', // verify: native speaker
+  modeShopDesc: 'Тиынға безендіру', // verify: native speaker
+  endless: 'Шексіз той', // verify: native speaker
+  endlessBest: 'Рекорд: {score} · {wave}-толқын', // verify: native speaker
+  waveReached: '{n}-толқынға жеттің', // verify: native speaker
+  runScore: 'Жарыс ұпайы: {n}', // verify: native speaker
+  waveLabel: '{n}-толқын', // verify: native speaker
+  again: 'Тағы да', // verify: native speaker
+  duel: 'Ботпен дуэль', // verify: native speaker
+  botName: 'Бот', // verify: native speaker
+  botEasy: 'Жеңіл', // verify: native speaker
+  botNormal: 'Қалыпты', // verify: native speaker
+  botHard: 'Күшті', // verify: native speaker
+  botThinking: 'Бот ойланып жатыр…', // verify: native speaker
+  chooseBot: 'Бот деңгейі', // verify: native speaker
+  editor: 'Сынақ құру', // verify: native speaker
+  myLevels: 'Менің сынақтарым', // verify: native speaker
+  shop: 'Дүкен', // verify: native speaker
+  addAsyk: 'Асық', // verify: native speaker
+  addGolden: 'Алтын', // verify: native speaker
+  addHeavy: 'Ауыр', // verify: native speaker
+  addBlock: 'Блок', // verify: native speaker
+  rotateLeft: 'Солға бұру', // verify: native speaker
+  rotateRight: 'Оңға бұру', // verify: native speaker
+  delete: 'Жою', // verify: native speaker
+  clearAll: 'Тазалау', // verify: native speaker
+  throwsLabel: 'Лақтыру', // verify: native speaker
+  parLabel: 'Пар', // verify: native speaker
+  nameLabel: 'Атауы', // verify: native speaker
+  namePlaceholder: 'Менің сынағым', // verify: native speaker
+  test: 'Тексеру', // verify: native speaker
+  share: 'Бөлісу', // verify: native speaker
+  save: 'Сақтау', // verify: native speaker
+  shareLocked: 'Алдымен өз сынағыңды өт', // verify: native speaker
+  errOverlap: 'Нысандар қиылысады немесе қоннан шығып кетті', // verify: native speaker
+  errFew: 'Кемінде бір асық қос', // verify: native speaker
+  errMany: 'Ең көбі 12 асық', // verify: native speaker
+  errBlocks: 'Ең көбі 6 блок', // verify: native speaker
+  saved: 'Сақталды', // verify: native speaker
+  verified: 'Өтілді', // verify: native speaker
+  notVerified: 'Әлі өтілмеді', // verify: native speaker
+  edit: 'Өңдеу', // verify: native speaker
+  editorHint: 'Қосу үшін түймені бас, сосын орнына сүйре', // verify: native speaker
+  emptyList: 'Әзірге бос', // verify: native speaker
+  limitReached: '20 сынаққа дейін сақтауға болады', // verify: native speaker
+  linkCopied: 'Сілтеме көшірілді', // verify: native speaker
+  copyFailed: 'Көшіру сәтсіз — сілтемені қолмен таңда', // verify: native speaker
+  challengeTitle: 'Сынақ!', // verify: native speaker
+  challengeFrom: '{name} {score} ұпай жинады. Асып түс!', // verify: native speaker
+  challengeNoScore: '{name} сені ойнауға шақырады', // verify: native speaker
+  friend: 'Дос', // verify: native speaker
+  compareYou: 'Сен', // verify: native speaker
+  youWon: 'Сен {name} жеңдің!', // verify: native speaker
+  youLost: '{name} әзірге алда', // verify: native speaker
+  youTied: '{name} екеуің тең', // verify: native speaker
+  counterChallenge: 'Жауап қайтару', // verify: native speaker
+  saveToMine: 'Өзіме сақтау', // verify: native speaker
+  challengeFriend: 'Досқа сынақ тастау', // verify: native speaker
+  card: 'Сурет', // verify: native speaker
+  cardShared: 'Сурет дайын', // verify: native speaker
+  backToEditor: 'Редакторға', // verify: native speaker
+  coinsEarned: '+{n} тиын', // verify: native speaker
+  tabLevels: 'Деңгейлер', // verify: native speaker
+  tabHistory: 'Тарих', // verify: native speaker
+  tabStats: 'Статистика', // verify: native speaker
+  tabAch: 'Марапаттар', // verify: native speaker
+  statBestCombo: 'Үздік комбо', // verify: native speaker
+  statStreak: 'Күн сериясы', // verify: native speaker
+  statCoins: 'Тиын', // verify: native speaker
+  chartTitle: 'Соңғы нәтижелер', // verify: native speaker
+  modeCampaign: 'Кампания', // verify: native speaker
+  modeVersus: 'Екеуміз', // verify: native speaker
+  modeDaily: 'Күнделікті', // verify: native speaker
+  modeEndless: 'Шексіз', // verify: native speaker
+  modeDuel: 'Дуэль', // verify: native speaker
+  modeCustom: 'Жеке', // verify: native speaker
+  modeTraining: 'Жаттығу', // verify: native speaker
+  difficulty: 'Қиындық', // verify: native speaker
+  diffNormal: 'Қалыпты', // verify: native speaker
+  diffEasy: 'Жеңіл', // verify: native speaker
+  diffHint: 'Жеңіл: ұзын бағыттаушы және кампанияда +1 лақтыру', // verify: native speaker
+  vibration: 'Діріл', // verify: native speaker
+  hintGolden: 'Алтын асық — 30 ұпай!', // verify: native speaker
+  hintHeavy: 'Ауыр асықты жылжыту қиын — күштірек ұр. 15 ұпай', // verify: native speaker
+  hintBlock: 'Тасты шығару мүмкін емес — бәрі одан серпіледі', // verify: native speaker
+  tapToClose: 'Жабу үшін түрт', // verify: native speaker
+  chapter1: 'Аула', // verify: native speaker
+  chapter2: 'Дала', // verify: native speaker
+  chapter3: 'Той-Pro', // verify: native speaker
+  custom: 'Жеке сынақ', // verify: native speaker
+  rulesValues: 'Алтын асық — 30, ауыр — 15, қарапайым — 10; тасты шығару мүмкін емес.', // verify: native speaker
+  shopTitle: 'Дүкен', // verify: native speaker
+  coins: 'Тиын', // verify: native speaker
+  buy: 'Сатып алу', // verify: native speaker
+  owned: 'Сатып алынған', // verify: native speaker
+  equip: 'Кию', // verify: native speaker
+  equipped: 'Кигізілген', // verify: native speaker
+  notEnough: 'Тиын жеткіліксіз', // verify: native speaker
+  catSaka: 'Сақа', // verify: native speaker
+  catTheme: 'Алаңдар', // verify: native speaker
+  catAsyk: 'Асықтар', // verify: native speaker
+  item_saka_bronze: 'Қола', // verify: native speaker
+  item_saka_silver: 'Күміс', // verify: native speaker
+  item_saka_gold: 'Алтын', // verify: native speaker
+  item_saka_oyu: 'Оюлы', // verify: native speaker
+  item_saka_jade: 'Нефрит', // verify: native speaker
+  item_saka_onyx: 'Оникс', // verify: native speaker
+  item_theme_yard: 'Аула', // verify: native speaker
+  item_theme_steppe: 'Дала', // verify: native speaker
+  item_theme_toy: 'Той', // verify: native speaker
+  item_theme_night: 'Түн', // verify: native speaker
+  item_asyk_bone: 'Ақ сүйек', // verify: native speaker
+  item_asyk_red: 'Қызыл', // verify: native speaker
+  proTitle: 'Той-Pro', // verify: native speaker
+  proDesc: '«Той» тарауы: 5 жаңа деңгей, 2 ерекше сақа және «Түн» алаңы. Безендіру ойын нәтижесіне әсер етпейді.', // verify: native speaker
+  buyTest: 'Сатып алу (СЫНАҚ)', // verify: native speaker
+  testMode: 'СЫНАҚ РЕЖИМІ — ақша алынбайды', // verify: native speaker
+  proConfirm: '«Той-Pro» сынақ сатып алуын растайсың ба?', // verify: native speaker
+  proGot: 'Не алдың', // verify: native speaker
+  proGotList: '«Той» тарауының 5 жаңа деңгейі · «Нефрит» және «Оникс» сақасы · «Түн» алаңы', // verify: native speaker
+  proOwned: 'Жинақ алынды', // verify: native speaker
+  proNote: 'Нақты төлем өшірілген: бұл ойында артықшылық бермейтін ақылы қосымшалар үлгісінің көрсетілімі.', // verify: native speaker
+  proOnly: 'Тек Той-Pro', // verify: native speaker
+  earnHint: 'Тиын сынақтарды өту, марапаттар және толқындар үшін беріледі', // verify: native speaker
+  ok: 'Түсінікті', // verify: native speaker
+  ach_first_throw: 'Алғашқы лақтыру', // verify: native speaker
+  achDesc_first_throw: 'Лақтыру жасау', // verify: native speaker
+  ach_first_win: 'Алғашқы аула', // verify: native speaker
+  achDesc_first_win: 'Сынақты өту', // verify: native speaker
+  ach_combo3: 'Үштік', // verify: native speaker
+  achDesc_combo3: 'Бір лақтыруда 3 асық шығару', // verify: native speaker
+  ach_combo4: 'Төрттік', // verify: native speaker
+  achDesc_combo4: 'Бір лақтыруда 4+ асық шығару', // verify: native speaker
+  ach_sniper: 'Мерген', // verify: native speaker
+  achDesc_sniper: 'Қатарынан 5 нәтижелі лақтыру', // verify: native speaker
+  ach_saver: 'Үнемші', // verify: native speaker
+  achDesc_saver: '≥ 3 лақтыру қалдырып өту', // verify: native speaker
+  ach_stars5: 'Бес жұлдыз', // verify: native speaker
+  achDesc_stars5: '5 түрлі деңгейде 3★', // verify: native speaker
+  ach_golden: 'Алтын қол', // verify: native speaker
+  achDesc_golden: 'Алтын асықты шығару', // verify: native speaker
+  ach_marathon: 'Марафоншы', // verify: native speaker
+  achDesc_marathon: 'Шексіз режимде 5-толқынға жету', // verify: native speaker
+  ach_duelist: 'Дуэлші', // verify: native speaker
+  achDesc_duelist: 'Күшті ботты жеңу', // verify: native speaker
+  ach_designer: 'Дизайнер', // verify: native speaker
+  achDesc_designer: 'Өз сынағыңмен бөлісу', // verify: native speaker
+  ach_daily3: 'Тұрақтылық', // verify: native speaker
+  achDesc_daily3: 'Күнделікті сынақ қатарынан 3 күн', // verify: native speaker
 };

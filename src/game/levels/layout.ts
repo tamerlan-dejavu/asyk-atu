@@ -1,8 +1,12 @@
-import { ASYK } from '../config';
-import type { AsykSpec, ZoneSpec } from '../../types';
+import { ASYK, BLOCK } from '../config';
+import type { AsykSpec, AsykType, ZoneSpec } from '../../types';
 
 const HALF_W = ASYK.w / 2;
 const HALF_H = ASYK.h / 2;
+
+function half(a: AsykSpec): [number, number] {
+  return a.type === 'block' ? [BLOCK.size / 2, BLOCK.size / 2] : [HALF_W, HALF_H];
+}
 
 interface Vec {
   x: number;
@@ -12,11 +16,12 @@ interface Vec {
 function corners(a: AsykSpec): Vec[] {
   const c = Math.cos(a.angle);
   const s = Math.sin(a.angle);
+  const [hw, hh] = half(a);
   return [
-    [-HALF_W, -HALF_H],
-    [HALF_W, -HALF_H],
-    [HALF_W, HALF_H],
-    [-HALF_W, HALF_H],
+    [-hw, -hh],
+    [hw, -hh],
+    [hw, hh],
+    [-hw, hh],
   ].map(([px, py]) => ({ x: a.x + px * c - py * s, y: a.y + px * s + py * c }));
 }
 
@@ -95,4 +100,14 @@ export function ring(cx: number, cy: number, n: number, radius: number, startAng
     out.push({ x: cx + Math.cos(th) * radius, y: cy + Math.sin(th) * radius, angle: th + Math.PI / 2 });
   }
   return out;
+}
+
+/** Задаёт тип всем телам списка. */
+export function withType(list: AsykSpec[], type: AsykType): AsykSpec[] {
+  return list.map((a) => ({ ...a, type }));
+}
+
+/** Назначает типы по кругу из списка. */
+export function cycleTypes(list: AsykSpec[], types: AsykType[]): AsykSpec[] {
+  return list.map((a, i) => ({ ...a, type: types[i % types.length] }));
 }
