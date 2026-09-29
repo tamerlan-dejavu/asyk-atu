@@ -127,6 +127,16 @@ export const kk: Dict = {
   qualityHint: 'Төмен сапа параллаксты, секіруді және жұмсақ көлеңкені өшіреді', // verify: native speaker
   mute: 'Дыбыс', // verify: native speaker
   rotate: 'Құрылғыны тігінен бұр', // verify: native speaker
+  quitConfirm: 'Раундтан шығасың ба? Оның прогресі сақталмайды.', // verify: native speaker
+  yourName: 'Атың (сілтеме үшін)', // verify: native speaker
+  yourNamePh: 'Мысалы, Аян', // verify: native speaker
+  confirmDelete: 'Бұл сынақты жою керек пе?', // verify: native speaker
+  minfo: 'Асық: {n} · Лақтыру: {t}', // verify: native speaker
+  duelVs: 'Сен ботқа қарсы ({bot})', // verify: native speaker
+  startDuel: 'Дуэльді бастау', // verify: native speaker
+  rulesValuesTitle: 'Ерекше асықтар', // verify: native speaker
+  newRun: 'Жаңа жарыс', // verify: native speaker
+  langLabel: 'Тіл', // verify: native speaker
   badLink: 'Сілтеме бүлінген немесе жарамсыз', // verify: native speaker
   waveN: '{n}-толқын', // verify: native speaker
   continue: 'Жалғастыру', // verify: native speaker

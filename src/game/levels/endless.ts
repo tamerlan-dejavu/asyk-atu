@@ -16,9 +16,12 @@ export function waveThrows(wave: number, reserve: number): number {
   return Math.ceil(waveCount(wave) * 1.2) + reserve;
 }
 
-/** Запас бросков после очищенной волны: +2 к оставшимся, но не больше 8. */
-export function nextReserve(leftover: number): number {
-  return Math.min(ENDLESS_RESERVE_MAX, Math.max(0, leftover) + ENDLESS_RESERVE_STEP);
+/**
+ * Запас бросков после очищенной волны: +2, но не больше 8. Неиспользованные броски волны
+ * в запас не переходят — они превращаются в бонус +10 за каждый (без двойной выгоды).
+ */
+export function nextReserve(reserve: number): number {
+  return Math.min(ENDLESS_RESERVE_MAX, Math.max(0, reserve) + ENDLESS_RESERVE_STEP);
 }
 
 /**

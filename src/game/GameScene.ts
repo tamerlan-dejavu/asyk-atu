@@ -823,15 +823,16 @@ export class GameScene extends Phaser.Scene {
     // ---- бесконечный режим: очищенная волна ведёт к следующей без экрана итога
     if (mode === 'endless' && win) {
       this.ctx.totalScore += summary.score;
-      this.ctx.reserve = nextReserve(finite(r.throwsLeft));
+      this.ctx.reserve = nextReserve(this.ctx.reserve);
       this.ctx.wave++;
       this.addCoins(COIN.wave);
       store.update((s) => {
-        s.endlessBest.wave = Math.max(s.endlessBest.wave, this.ctx.wave - 1);
+        s.endlessBest.wave = Math.max(s.endlessBest.wave, this.ctx.wave);
         s.endlessBest.score = Math.max(s.endlessBest.score, this.ctx.totalScore);
       });
       this.ach({ type: 'wave', wave: this.ctx.wave });
       sfx.win();
+      this.publish();
       bus.emit('state', next);
       bus.emit('banner', { key: 'waveN', params: { n: this.ctx.wave } });
       this.after(1000, () => {
@@ -878,7 +879,7 @@ export class GameScene extends Phaser.Scene {
       store.update((s) => {
         newBest = total > s.endlessBest.score;
         s.endlessBest.score = Math.max(s.endlessBest.score, total);
-        s.endlessBest.wave = Math.max(s.endlessBest.wave, reached - 1);
+        s.endlessBest.wave = Math.max(s.endlessBest.wave, reached);
       });
       endless = { wave: reached, total, best: store.data.endlessBest.score, newBest, runSeed: this.ctx.runSeed };
       newRecord = newBest;

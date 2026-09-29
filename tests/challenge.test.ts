@@ -137,7 +137,8 @@ describe('бесконечный режим', () => {
     expect(waveThrows(1, 0)).toBe(5);
     expect(waveThrows(4, 3)).toBe(Math.ceil(7 * 1.2) + 3);
     expect(nextReserve(0)).toBe(2);
-    expect(nextReserve(9)).toBe(8);
+    expect(nextReserve(2)).toBe(4);
+    expect(nextReserve(8)).toBe(8);
   });
   it('типы появляются с нужных волн', () => {
     const types = (w: number) => new Set(endlessWave(77, w).asyks.map((a) => a.type));
