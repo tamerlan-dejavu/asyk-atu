@@ -335,6 +335,8 @@ function renderModal(): void {
 }
 
 function renderAll(): void {
+  const rot = document.getElementById('rotate');
+  if (rot) rot.textContent = '↻ ' + t('rotate');
   renderScreen();
   renderHud();
   renderModal();
@@ -522,6 +524,17 @@ export function initUI(): void {
     { passive: false },
   );
   for (const ev of ['gesturestart', 'gesturechange', 'gestureend', 'dblclick']) document.addEventListener(ev, (e) => e.preventDefault());
+
+  const rot = document.createElement('div');
+  rot.id = 'rotate';
+  rot.setAttribute('role', 'alert');
+  document.body.appendChild(rot);
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape') {
+      if (gstate === 'PAUSED') bus.emit('resume', undefined);
+      else if (gstate === 'AIMING' || gstate === 'FLYING' || gstate === 'SETTLING') bus.emit('pause', undefined);
+    }
+  });
 
   renderAll();
 }

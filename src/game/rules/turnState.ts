@@ -60,8 +60,9 @@ export class StateMachine {
     return true;
   }
 
+  /** Пауза допустима не везде (например, не во время вступления/итога) — тогда просто false, без ошибки. */
   pause(): boolean {
-    return this.go('PAUSED');
+    return canTransition(this.state, 'PAUSED') && this.go('PAUSED');
   }
 
   resume(): boolean {

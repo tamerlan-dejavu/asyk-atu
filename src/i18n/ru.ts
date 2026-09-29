@@ -114,6 +114,7 @@ export const ru = {
   qualityLow: 'Низкое',
   qualityHint: 'Низкое отключает параллакс, подпрыгивание и мягкие тени',
   mute: 'Звук',
+  rotate: 'Поверни устройство вертикально',
 } as const;
 
 export type Dict = Record<keyof typeof ru, string>;

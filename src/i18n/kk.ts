@@ -116,4 +116,5 @@ export const kk: Dict = {
   qualityLow: 'Төмен', // verify: native speaker
   qualityHint: 'Төмен сапа параллаксты, секіруді және жұмсақ көлеңкені өшіреді', // verify: native speaker
   mute: 'Дыбыс', // verify: native speaker
+  rotate: 'Құрылғыны тігінен бұр', // verify: native speaker
 };

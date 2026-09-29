@@ -937,3 +937,23 @@ input:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Горизонтальная ориентация на телефоне: просим повернуть (игра портретная) */
+#rotate {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
+  #rotate {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    padding: 2em;
+    background: #2b1a0e;
+    color: #f6ecd0;
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+}

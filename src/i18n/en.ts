@@ -115,4 +115,5 @@ export const en: Dict = {
   qualityLow: 'Low',
   qualityHint: 'Low disables parallax, bounce and soft shadows',
   mute: 'Sound',
+  rotate: 'Rotate your device to portrait',
 };
