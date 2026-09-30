@@ -131,7 +131,7 @@ export const en: Dict = {
   overshoot: 'Overshot!',
   ruleset: 'Throw',
   rulesetClassic: 'Classic',
-  rulesetLoft: 'Lob (beta)',
+  rulesetLoft: 'Lob',
   rulesetHint: 'Lob: the saka flies in an arc, bounces off the ground and can clear stones. Pick the height with the buttons on the right.',
   modeLoftDesc: 'Throw with height: arc, bounces, flying over stones',
   loftLow: 'Low',

@@ -61,16 +61,24 @@ describe('раздельные рекорды', () => {
 });
 
 describe('миграция сохранения', () => {
-  it('без новых полей: классика, средняя высота, пустой рекорд навеса; старые данные на месте', () => {
+  it('без новых полей: навес, средняя высота, пустой рекорд навеса; старые данные на месте', () => {
     const old = { v: 2, lang: 'kk', unlocked: 4, levels: { '2': { best: 50, stars: 2, plays: 1 } } };
     const s = sanitize(old);
-    expect(s.ruleset).toBe('classic');
+    expect(s.ruleset).toBe('loft');
     expect(s.loft).toBe('mid');
     expect(s.endlessBestLoft).toEqual({ score: 0, wave: 0 });
     expect(s.levels['2'].best).toBe(50);
     expect(s.lang).toBe('kk');
     expect(sanitize({ ...old, ruleset: 'loft', loft: 'high' })).toMatchObject({ ruleset: 'loft', loft: 'high' });
-    expect(sanitize({ ...old, ruleset: 'moon', loft: 'sky' })).toMatchObject({ ruleset: 'classic', loft: 'mid' });
-    expect(sanitize({ v: 1, unlocked: 2 }).ruleset).toBe('classic');
+    expect(sanitize({ ...old, ruleset: 'moon', loft: 'sky' })).toMatchObject({ ruleset: 'loft', loft: 'mid' });
+    expect(sanitize({ v: 1, unlocked: 2 }).ruleset).toBe('loft');
+  });
+
+  it('классика — только если игрок выбрал её сам', () => {
+    const old = { v: 2, unlocked: 4 };
+    // прежний сохранённый 'classic' был значением по умолчанию → навес
+    expect(sanitize({ ...old, ruleset: 'classic' }).ruleset).toBe('loft');
+    expect(sanitize({ ...old, ruleset: 'classic', rulesetChosen: true })).toMatchObject({ ruleset: 'classic', rulesetChosen: true });
+    expect(sanitize({ ...old, ruleset: 'loft', rulesetChosen: true }).ruleset).toBe('loft');
   });
 });

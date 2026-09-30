@@ -65,7 +65,8 @@ export function defaultSave(): SaveV2 {
     view: '3d',
     viewChosen: false,
     view3dBlocked: false,
-    ruleset: 'classic',
+    ruleset: 'loft',
+    rulesetChosen: false,
     loft: 'mid',
     endlessBestLoft: { score: 0, wave: 0 },
   };
@@ -262,7 +263,9 @@ export function sanitize(raw: unknown): SaveV2 {
     viewChosen: isV2 && r.viewChosen === true,
     view3dBlocked: isV2 && r.view3dBlocked === true,
     // миграция: полей нет → классика и средняя высота
-    ruleset: isV2 && r.ruleset === 'loft' ? 'loft' : 'classic',
+    // классика — только если игрок выбрал её сам; прежний сохранённый 'classic' был лишь значением по умолчанию → навес
+    ruleset: isV2 && r.rulesetChosen === true && r.ruleset === 'classic' ? 'classic' : 'loft',
+    rulesetChosen: isV2 && r.rulesetChosen === true,
     loft: isV2 && (r.loft === 'low' || r.loft === 'high') ? r.loft : 'mid',
     endlessBestLoft: {
       score: Math.floor(num(isObj(r.endlessBestLoft) ? r.endlessBestLoft.score : 0, 0)),

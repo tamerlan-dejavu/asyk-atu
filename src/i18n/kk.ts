@@ -131,7 +131,7 @@ export const kk: Dict = {
   overshoot: 'Асып кетті!', // verify: native speaker
   ruleset: 'Лақтыру', // verify: native speaker
   rulesetClassic: 'Классикалық', // verify: native speaker
-  rulesetLoft: 'Биіктен (бета)', // verify: native speaker
+  rulesetLoft: 'Биіктен', // verify: native speaker
   rulesetHint:
     'Биіктен: сақа доғамен ұшады, жерден серпіледі, тастардың үстінен асып кетуі мүмкін. Биіктікті оң жақтағы түймелермен таңда.', // verify: native speaker
   modeLoftDesc: 'Биіктікпен лақтыру: доға, серпілу, тас үстінен ұшу', // verify: native speaker

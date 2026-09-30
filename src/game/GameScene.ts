@@ -1586,7 +1586,7 @@ function hasWebGLQuick(): boolean {
   }
 }
 
-/** Набор правил по умолчанию: ?ruleset=loft на сессию, иначе настройка (по умолчанию классика). */
+/** Набор правил: ?ruleset=loft|classic на сессию, иначе настройка (по умолчанию навес). */
 export function currentRuleset(): Ruleset {
   const q = new URLSearchParams(location.search).get('ruleset');
   if (q === 'loft' || q === 'classic') return q;

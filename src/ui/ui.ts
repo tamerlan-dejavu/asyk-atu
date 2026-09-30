@@ -903,11 +903,17 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
       renderHud();
       break;
     case 'rulesetSet':
-      store.update((s) => (s.ruleset = arg === 'loft' ? 'loft' : 'classic'));
+      store.update((s) => {
+        s.ruleset = arg === 'loft' ? 'loft' : 'classic';
+        s.rulesetChosen = true;
+      });
       renderAll();
       break;
     case 'loftPlay':
-      store.update((s) => (s.ruleset = 'loft'));
+      store.update((s) => {
+        s.ruleset = 'loft';
+        s.rulesetChosen = true;
+      });
       gotoScreen('levels');
       break;
     case 'viewSet':
