@@ -14,6 +14,10 @@ export default defineConfig({
     viewport: { width: 390, height: 844 },
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
+    // обход защиты preview-деплоев Vercel (секрет «Protection Bypass for Automation»)
+    extraHTTPHeaders: process.env.VERCEL_BYPASS
+      ? { 'x-vercel-protection-bypass': process.env.VERCEL_BYPASS, 'x-vercel-set-bypass-cookie': 'true' }
+      : undefined,
   },
   webServer: external
     ? undefined

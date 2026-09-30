@@ -7,6 +7,7 @@
 1. Vercel → **Add New → Project** → импорт `tamerlan-dejavu/asyk-atu`. Настройки берутся из `vercel.json` (Vite, `npm run build`, `dist`).
 2. Deploy. Production собирается из `main`, preview — из каждой ветки и pull request.
 3. GitHub → Settings → Secrets and variables → Actions → **Variables**: `SITE_URL` = адрес production (для `uptime.yml`).
+4. Post-deploy smoke: production проверяется по `SITE_URL` (по умолчанию `https://asyk-atu.vercel.app`). Адреса отдельных preview-деплоев Vercel закрыты защитой (302 на вход в Vercel); чтобы проверять и их, в Vercel → Settings → Deployment Protection → **Protection Bypass for Automation** создать секрет и добавить его в GitHub как secret `VERCEL_AUTOMATION_BYPASS_SECRET`. Без секрета smoke для preview пропускается с пометкой, а не падает.
 
 ### 1.2 Облако (Supabase) — 15 минут
 

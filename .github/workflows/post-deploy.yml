@@ -15,24 +15,49 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Resolve URL
+        id: url
+        env:
+          ENVIRONMENT: ${{ github.event.deployment.environment }}
+          DEPLOY_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          # Адреса отдельных деплоев Vercel закрыты защитой (302 на вход в Vercel).
+          # Production проверяем по публичному адресу; preview — только с секретом обхода защиты.
+          if [ "$ENVIRONMENT" = "Production" ]; then
+            echo "url=${SITE_URL:-https://asyk-atu.vercel.app}" >> "$GITHUB_OUTPUT"
+          elif [ -n "$BYPASS" ]; then
+            echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Preview защищён Vercel, а секрет VERCEL_AUTOMATION_BYPASS_SECRET не задан — smoke для preview пропущен"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.url.outputs.skip != '1'
         with:
           ref: ${{ github.event.deployment.sha }}
 
       - uses: actions/setup-node@v4
+        if: steps.url.outputs.skip != '1'
         with:
           node-version: 22
           cache: npm
 
       - run: npm ci
+        if: steps.url.outputs.skip != '1'
 
       - name: Install Chromium
+        if: steps.url.outputs.skip != '1'
         run: npx playwright install --with-deps chromium
 
       - name: Smoke against deployment
+        if: steps.url.outputs.skip != '1'
         run: npx playwright test
         env:
-          BASE_URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+          BASE_URL: ${{ steps.url.outputs.url }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - name: Upload report
         if: failure()
@@ -49,7 +74,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const url = context.payload.deployment_status.environment_url || context.payload.deployment_status.target_url;
+            const url = '${{ steps.url.outputs.url }}';
             const sha = context.payload.deployment.sha.slice(0, 7);
             await github.rest.issues.create({
               owner: context.repo.owner,
