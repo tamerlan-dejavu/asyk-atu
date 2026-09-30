@@ -53,6 +53,9 @@ export interface SaveV1 {
   sound: boolean;
   /** громкость эффектов 0…1 (выключение — «Звук») */
   volume: number;
+  /** фоновая музыка вкл/выкл и её громкость 0…1 (по умолчанию 0,35) */
+  musicOn: boolean;
+  musicVolume: number;
   quality: Quality;
   tutorialDone: boolean;
   unlocked: number;

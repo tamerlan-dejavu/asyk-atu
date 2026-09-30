@@ -8,6 +8,27 @@ class Sfx {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  private readonly unlockFns: (() => void)[] = [];
+  private duckFn: ((ms: number) => void) | null = null;
+
+  /** Общий AudioContext (после первого жеста; до него — null). Им же пользуется музыка. */
+  get context(): AudioContext | null {
+    return this.ctx;
+  }
+
+  /** Вызывается, когда контекст создан/возобновлён жестом пользователя. */
+  onUnlock(fn: () => void): void {
+    this.unlockFns.push(fn);
+  }
+
+  /** Приглушение фоновой музыки на время звука игры. */
+  onDuck(fn: (ms: number) => void): void {
+    this.duckFn = fn;
+  }
+
+  private duck(ms = 160): void {
+    if (this.enabled) this.duckFn?.(ms);
+  }
 
   get enabled(): boolean {
     return store.data.sound;
@@ -16,7 +37,7 @@ class Sfx {
   /** Вызывать из обработчика жеста (pointerdown/keydown). */
   unlock(): void {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      if (this.ctx.state === 'suspended') void this.ctx.resume().then(() => this.unlockFns.forEach((f) => f()));
       return;
     }
     try {
@@ -34,6 +55,7 @@ class Sfx {
         seed = (seed * 1664525 + 1013904223) >>> 0;
         d[i] = seed / 2147483648 - 1;
       }
+      this.unlockFns.forEach((f) => f());
     } catch {
       this.ctx = null;
     }
@@ -91,6 +113,7 @@ class Sfx {
 
   /** Удар: щелчок дерева/кости. `strength` 0…1. */
   hit(strength: number): void {
+    this.duck(140);
     const s = Math.min(1, Math.max(0.15, strength));
     const pitch = 700 + s * 500;
     this.tone(pitch, 0.06, 'square', 0.1 * s, 0, pitch * 0.55);
@@ -105,6 +128,7 @@ class Sfx {
   }
 
   out(): void {
+    this.duck(200);
     this.tone(520, 0.14, 'sine', 0.2, 0, 900);
   }
 
@@ -114,10 +138,13 @@ class Sfx {
   }
 
   win(): void {
+    // стингер победы поверх музыки: фон приглушён на время звучания
+    this.duck(1600);
     [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.28, 'triangle', 0.22, i * 0.11));
   }
 
   lose(): void {
+    this.duck(1200);
     [392, 330, 262].forEach((f, i) => this.tone(f, 0.3, 'sawtooth', 0.1, i * 0.16));
   }
 
@@ -127,6 +154,7 @@ class Sfx {
 
   /** Тяжёлый асык: низкий глухой удар. */
   heavy(strength: number): void {
+    this.duck(200);
     const s = Math.min(1, Math.max(0.3, strength));
     this.tone(70, 0.28, 'sine', 0.35 * s, 0, 38);
     this.burst(0.18, 0.3 * s, 220, 0, 0.6);

@@ -393,8 +393,11 @@ export const ru = {
   rarityCommon: 'Обычный',
   rarityRare: 'Редкий',
   rarityEpic: 'Эпический',
-  volume: 'Громкость',
+  volume: 'Звуки',
   qualityMedium: 'Среднее',
+  music: 'Музыка',
+  creditModel: '3D-модель асыка',
+  creditSource: 'источник',
 } as const;
 
 export type Dict = Record<keyof typeof ru, string>;

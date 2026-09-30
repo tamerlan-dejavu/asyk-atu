@@ -396,6 +396,9 @@ export const kk: Dict = {
   rarityCommon: 'Қарапайым', // verify: native speaker
   rarityRare: 'Сирек', // verify: native speaker
   rarityEpic: 'Эпикалық', // verify: native speaker
-  volume: 'Дыбыс деңгейі', // verify: native speaker
+  volume: 'Дыбыстар', // verify: native speaker
   qualityMedium: 'Орташа', // verify: native speaker
+  music: 'Музыка', // verify: native speaker
+  creditModel: 'Асықтың 3D-моделі', // verify: native speaker
+  creditSource: 'дереккөз', // verify: native speaker
 };

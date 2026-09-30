@@ -1,0 +1,17 @@
+Асық ату — благодарности / Credits
+
+Музыка / Music (Pixabay Content License — free to use in games; attribution given with thanks)
+  • Меню / Menu:  "Poetica" — roman_sol (Pixabay)
+      https://pixabay.com/music/search/poetica%20roman_sol/
+  • Игра / Game:  "Atlas Kazakhstan" — vadim_makes_sound (Pixabay)
+      https://pixabay.com/music/search/atlas%20kazakhstan/
+  Треки перекодированы в моно MP3 64 kbps для веба. / Re-encoded to mono MP3 64 kbps.
+  Если файлы недоступны, играет процедурная домбра (WebAudio). / Fallback: procedural dombra (WebAudio).
+
+3D-модель асыка / Asyk 3D model
+  • "Asyq (асық, асык) 3d model" — cozaim (Sketchfab), CC BY-NC 4.0
+      https://sketchfab.com/3d-models/asyq-3d-model-098b2e1cbda7465cb31177ac7c4dfe57
+  Изменения: упрощена сетка, уменьшены текстуры, модель повёрнута и масштабирована. / Mesh simplified, textures reduced, rotated and scaled.
+
+Шрифты / Fonts: Montserrat Alternates, Nunito — SIL Open Font License 1.1
+Библиотеки / Libraries: Phaser, Matter.js, Three.js — MIT

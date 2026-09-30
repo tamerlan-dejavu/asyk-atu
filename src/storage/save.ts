@@ -42,6 +42,8 @@ export function defaultSave(): SaveV2 {
     lang: 'ru',
     sound: true,
     volume: 0.8,
+    musicOn: true,
+    musicVolume: 0.35,
     quality: 'auto',
     tutorialDone: false,
     unlocked: 0,
@@ -226,6 +228,9 @@ export function sanitize(raw: unknown): SaveV2 {
     lang,
     sound: typeof r.sound === 'boolean' ? r.sound : d.sound,
     volume: typeof r.volume === 'number' && Number.isFinite(r.volume) ? Math.min(1, Math.max(0, r.volume)) : d.volume,
+    musicOn: typeof r.musicOn === 'boolean' ? r.musicOn : d.musicOn,
+    musicVolume:
+      typeof r.musicVolume === 'number' && Number.isFinite(r.musicVolume) ? Math.min(1, Math.max(0, r.musicVolume)) : d.musicVolume,
     quality,
     tutorialDone: typeof r.tutorialDone === 'boolean' ? r.tutorialDone : d.tutorialDone,
     unlocked: Math.min(MAX_PRO_LEVEL, Math.floor(num(r.unlocked, 0))),
@@ -391,6 +396,9 @@ export class SaveStore {
     const keep = {
       lang: this.cache.lang,
       sound: this.cache.sound,
+      volume: this.cache.volume,
+      musicOn: this.cache.musicOn,
+      musicVolume: this.cache.musicVolume,
       quality: this.cache.quality,
       vibration: this.cache.vibration,
       difficulty: this.cache.difficulty,

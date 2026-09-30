@@ -1,3 +1,4 @@
+import { MODEL_CREDIT, MUSIC_CREDITS, type Credit } from '../content/credits';
 import { cloud, type AuthError, type BoardRow } from '../cloud/cloud';
 import { dateKey } from '../game/levels/daily';
 import { LEVELS } from '../game/levels/levels';
@@ -61,7 +62,11 @@ export function syncLabel(): string {
 
 export function aboutBlock(): string {
   const time = BUILD.time ? BUILD.time.replace('T', ' ').slice(0, 16) + ' UTC' : '—';
-  return `<h3>${t('about')}</h3><p class="small mono">${t('buildInfo', { sha: BUILD.sha, time })}</p>`;
+  const credit = (c: Credit) =>
+    `<li><b>«${c.title}»</b> — ${c.author} · ${c.license} · <a href="${c.url}" target="_blank" rel="noopener noreferrer">${t('creditSource')}</a></li>`;
+  return `<h3>${t('about')}</h3><p class="small mono">${t('buildInfo', { sha: BUILD.sha, time })}</p>
+    <h3>${t('music')}</h3><ul class="credits small">${MUSIC_CREDITS.map(credit).join('')}</ul>
+    <h3>${t('creditModel')}</h3><ul class="credits small">${credit(MODEL_CREDIT)}</ul>`;
 }
 
 // ------------------------------------------------------------------ профиль

@@ -796,3 +796,16 @@ kbd {
     opacity: 0;
   }
 }
+
+/* благодарности в «Об игре» */
+.credits {
+  margin: 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+}
+.credits a {
+  color: var(--accent);
+  pointer-events: auto;
+}

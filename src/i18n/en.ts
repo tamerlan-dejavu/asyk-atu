@@ -395,6 +395,9 @@ export const en: Dict = {
   rarityCommon: 'Common',
   rarityRare: 'Rare',
   rarityEpic: 'Epic',
-  volume: 'Volume',
+  volume: 'Sounds',
   qualityMedium: 'Medium',
+  music: 'Music',
+  creditModel: 'Asyk 3D model',
+  creditSource: 'source',
 };

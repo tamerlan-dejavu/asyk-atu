@@ -1,5 +1,6 @@
 import { bus, type HudData, type ResultData, type StartRequest } from '../bus';
 import { sfx } from '../audio/sfx';
+import { music } from '../audio/music';
 import { challengeToLevel, decodeChallenge } from '../challenge/codec';
 import { parseHash, type LinkKind } from '../challenge/link';
 import { FEATURES } from '../config/features';
@@ -372,6 +373,9 @@ function settingsScreen(): string {
       <h3>${t('sound')}</h3>
       <div class="chips">${opt('soundSet', '1', t('on'), s.sound)}${opt('soundSet', '0', t('off'), !s.sound)}</div>
       <label class="slider"><span>${t('volume')}</span><input type="range" min="0" max="100" step="5" data-vol="1" value="${Math.round(s.volume * 100)}" aria-label="${t('volume')}"/><output>${Math.round(s.volume * 100)}%</output></label>
+      <h3>${t('music')}</h3>
+      <div class="chips">${opt('musicSet', '1', t('on'), s.musicOn)}${opt('musicSet', '0', t('off'), !s.musicOn)}</div>
+      <label class="slider"><span>${t('music')}</span><input type="range" min="0" max="100" step="5" data-mvol="1" value="${Math.round(s.musicVolume * 100)}" aria-label="${t('music')}"/><output>${Math.round(s.musicVolume * 100)}%</output></label>
       ${canVibrate ? `<h3>${t('vibration')}</h3><div class="chips">${opt('vibSet', '1', t('on'), s.vibration)}${opt('vibSet', '0', t('off'), !s.vibration)}</div>` : ''}
       <h3>${t('ruleset')}</h3>
       <div class="chips">${opt('rulesetSet', 'classic', t('rulesetClassic'), s.ruleset !== 'loft')}${opt('rulesetSet', 'loft', t('rulesetLoft'), s.ruleset === 'loft')}</div>
@@ -950,12 +954,14 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
     case 'sound':
       store.update((s) => (s.sound = !s.sound));
       sfx.unlock();
+      music.apply();
       sfx.click();
       renderAll();
       break;
     case 'soundSet':
       store.update((s) => (s.sound = arg === '1'));
       sfx.unlock();
+      music.apply();
       sfx.click();
       renderAll();
       break;
@@ -1017,6 +1023,12 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
     case 'quitNo':
       confirmQuit = false;
       renderModal();
+      break;
+    case 'musicSet':
+      store.update((s) => (s.musicOn = arg === '1'));
+      sfx.unlock();
+      music.apply();
+      renderAll();
       break;
     case 'restartYes':
       confirmRestart = false;
@@ -1317,6 +1329,20 @@ function onKey(e: KeyboardEvent): void {
   }
 }
 
+/**
+ * Музыка по экрану: меню, магазин, итоги — трек «menu»; раунд — «game» (кроссфейд 1,2 с).
+ * Пауза игры — музыка на паузе и продолжается с того же места.
+ */
+function syncMusic(prev: GameState): void {
+  if (gstate === 'PAUSED') {
+    music.pause();
+    return;
+  }
+  if (prev === 'PAUSED' && !document.hidden) music.resume();
+  const menu = gstate === 'MENU' || gstate === 'LEVEL_COMPLETE' || gstate === 'LEVEL_FAILED';
+  music.play(menu ? 'menu' : 'game');
+}
+
 /** Итог раунда: звёзды загораются по очереди (звук + искры), очки и тиын «набегают». */
 function animateResult(r: ResultData): void {
   const modal = $('modal');
@@ -1428,6 +1454,14 @@ export function initUI(): void {
     });
     el.addEventListener('input', (e) => {
       const t = e.target as HTMLInputElement;
+      if (t.dataset.mvol !== undefined) {
+        const v = Number(t.value) / 100;
+        store.update((s) => (s.musicVolume = v));
+        music.apply();
+        const out = t.parentElement?.querySelector('output');
+        if (out) out.textContent = `${t.value}%`;
+        return;
+      }
       if (t.dataset.vol !== undefined) {
         const v = Number(t.value) / 100;
         store.update((s) => (s.volume = v));
@@ -1451,6 +1485,12 @@ export function initUI(): void {
     renderAll();
   });
   bus.on('backdrop', ({ ground, far }) => drawBackdrop(ground, far));
+  // музыка: трек меню ждёт первого жеста; вкладка скрыта — пауза, вернулись — продолжение (если игра не на паузе)
+  music.play('menu');
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) music.pause();
+    else if (gstate !== 'PAUSED') music.resume();
+  });
   document.addEventListener('fullscreenchange', () => renderAll());
 
   bus.on('hud', (h) => {
@@ -1461,6 +1501,7 @@ export function initUI(): void {
     const prev = gstate;
     gstate = s;
     if (s !== 'PAUSED') confirmRestart = false;
+    syncMusic(prev);
     if (s === 'MENU') {
       result = null;
       tutStep = -1;

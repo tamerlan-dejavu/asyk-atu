@@ -11,6 +11,8 @@ import './ui/theme.css';
 import { GameScene } from './game/GameScene';
 import { FIELD_H, FIELD_W } from './game/config';
 import { initUI } from './ui/ui';
+import { sfx } from './audio/sfx';
+import { prefetchMusic } from './audio/music';
 import { initLayout, isWide } from './ui/layout';
 import { setLang } from './i18n';
 import { store } from './storage/save';
@@ -50,6 +52,9 @@ const game = new Phaser.Game({
 });
 
 initUI();
+// звук и музыка — только после жеста пользователя (touchend — для iOS)
+for (const ev of ['pointerdown', 'keydown', 'touchend']) window.addEventListener(ev, () => sfx.unlock(), { capture: true });
+prefetchMusic();
 initAnalytics();
 initDebugPanel(() => game.loop.actualFps);
 // облако — надстройка: без сети или без настроек игра работает как раньше
