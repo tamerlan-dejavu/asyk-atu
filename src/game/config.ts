@@ -32,16 +32,17 @@ export const VELOCITY_ITERATIONS = 6;
 /** Потолок скорости тел (px за шаг 1/60 с). */
 export const MAX_BODY_SPEED = 30;
 
-/** Скорость сақа при слабом/сильном броске (px за шаг). 100 % долетает чуть дальше дальнего края кона. */
-export const POWER_MIN = 8;
-export const POWER_MAX = 26;
+/** Скорость сақа при слабом/сильном броске (px за шаг). Бросок спокойнее прежнего (26 → 24): 100 % доходит до дальнего края кона. */
+export const POWER_MIN = 7;
+export const POWER_MAX = 24;
 
 export const ASYK = {
   w: 44,
   h: 26,
   density: 0.001,
   friction: 0.4,
-  restitution: 0.4,
+  /** асыки отскакивают мягче и быстрее останавливаются (не «разлетаются» от каждого касания) */
+  restitution: 0.3,
   frictionAir: 0.03,
 };
 export const SAKA = {
@@ -49,7 +50,7 @@ export const SAKA = {
   h: 34,
   density: 0.001 * 2.5, // сақа утяжелена — как в традиции
   friction: 0.4,
-  restitution: 0.35,
+  restitution: 0.28,
   frictionAir: 0.03,
 };
 export const WALL_RESTITUTION = 0.5;
@@ -92,13 +93,13 @@ export const PARALLAX_MAX = 12;
 export const LOFT_ANGLE_DEG = { low: 8, mid: 15, high: 22 } as const;
 export const LOFT = {
   /** гравитация по вертикали, px/шаг² (шаг 1/60 с): навесной полёт ≈ 0,8 с, низкий ≈ 0,45 с */
-  GRAVITY_Z: 0.35,
+  GRAVITY_Z: 0.28,
   /** сопротивление воздуха в полёте (frictionAir тела, пока оно в воздухе) */
   AIR_DRAG_FLIGHT: 0.006,
   /** стартовая высота сақа («рука над землёй») */
   Z0: 12,
   /** дальность ПЕРВОГО приземления при 100 % силы: чуть дальше дальнего края кона */
-  TARGET_RANGE: 820,
+  TARGET_RANGE: 800,
   /** нижняя граница силы (чтобы слабый жест не давал «бросок на месте») */
   MIN_POWER: 0.04,
   /** ниже этой скорости удара о землю тело перестаёт подпрыгивать */
@@ -112,7 +113,7 @@ export const LOFT = {
   MARGIN_Z: 2,
   /** подпрыгивание асыка от удара сақа: vz = min(POP_K·s, POP_MAX) при s > POP_MIN_SPEED (px/шаг) */
   POP_MIN_SPEED: 6,
-  POP_K: 0.22,
+  POP_K: 0.2,
   POP_MAX: 7,
   POP_HEAVY: 0.4,
   /** толщины тел для проверки пересечения по высоте */

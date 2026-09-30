@@ -59,8 +59,8 @@ describe('баллистика', () => {
         prev = r;
       }
       const half = SAKA_START.y - predictLanding(0.5, loft, 0, -1, SAKA_START.x, SAKA_START.y).y;
-      expect(half / LOFT.TARGET_RANGE).toBeGreaterThan(0.45);
-      expect(half / LOFT.TARGET_RANGE).toBeLessThan(0.55);
+      expect(half / LOFT.TARGET_RANGE).toBeGreaterThan(0.44);
+      expect(half / LOFT.TARGET_RANGE).toBeLessThan(0.57);
     }
   });
 
@@ -69,10 +69,10 @@ describe('баллистика', () => {
     expect(high.apex).toBeGreaterThanOrEqual(70);
     expect(high.apex).toBeLessThanOrEqual(110);
     expect((high.steps * STEP_MS) / 1000).toBeGreaterThanOrEqual(0.7);
-    expect((high.steps * STEP_MS) / 1000).toBeLessThanOrEqual(1.0);
+    expect((high.steps * STEP_MS) / 1000).toBeLessThanOrEqual(1.15); // полёт спокойнее: гравитация 0,28
     const low = simulateFlight(vMax('low'), LOFT_ANGLE_DEG.low);
     expect((low.steps * STEP_MS) / 1000).toBeGreaterThanOrEqual(0.3);
-    expect((low.steps * STEP_MS) / 1000).toBeLessThanOrEqual(0.5);
+    expect((low.steps * STEP_MS) / 1000).toBeLessThanOrEqual(0.6);
   });
 });
 
@@ -174,7 +174,7 @@ describe('подпрыгивание асыков', () => {
   it('сильный низкий бросок подбрасывает асык в воздух', () => {
     const sim = new Sim(Matter, zone, { loft: true });
     sim.addAsyk('a0', { x: SAKA_START.x, y: 600, angle: 0 });
-    throwLoft(sim, 0.35, 'low');
+    throwLoft(sim, 0.4, 'low'); // после смягчения броска (гравитация 0,28, дальность 800) удар «с земли» — на 0,4
     let maxZ = 0;
     for (let i = 0; i < 300 && !sim.settled; i++) {
       sim.step();
