@@ -1,6 +1,14 @@
 import Phaser from 'phaser';
+// шрифты локально (без внешних запросов): кириллица и казахские буквы — подмножество cyrillic-ext
+import '@fontsource/montserrat-alternates/700.css';
+import '@fontsource/montserrat-alternates/800.css';
+import '@fontsource/nunito/400.css';
+import '@fontsource/nunito/700.css';
+import '@fontsource/nunito/800.css';
+import './styles/tokens.css';
 import './ui/styles.css';
 import './ui/desktop.css';
+import './ui/theme.css';
 import { GameScene } from './game/GameScene';
 import { FIELD_H, FIELD_W } from './game/config';
 import { initUI } from './ui/ui';

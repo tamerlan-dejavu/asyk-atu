@@ -14,5 +14,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "tests", "scripts/shots.ts", "vite.config.ts", "playwright.config.ts"]
+  "include": ["src", "tests", "scripts/**/*.ts", "vite.config.ts", "playwright.config.ts"]
 }

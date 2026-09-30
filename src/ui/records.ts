@@ -4,7 +4,7 @@ import { PRO_LEVELS } from '../game/levels/levels-pro';
 import { ACHIEVEMENTS, progressOf } from '../game/rules/achievements';
 import { t, type Key } from '../i18n';
 import { MAX_LEVEL, store } from '../storage/save';
-import { esc, levelName, modeLabel, ornament, stars } from './common';
+import { esc, icon, levelName, modeLabel, ornament, stars } from './common';
 import { cloudHistoryBlock } from './cloudui';
 import { dailyKey as rsDailyKey, levelKey } from '../game/rules/ruleset';
 
@@ -29,7 +29,7 @@ function levelsTab(confirmReset: boolean): string {
   const eb = s.ruleset === 'loft' ? s.endlessBestLoft : s.endlessBest;
   return `
     <p class="small rs-label">${t('rulesetOf', { name: t(s.ruleset === 'loft' ? 'rulesetLoft' : 'rulesetClassic') })} · <button class="linkbtn" data-act="rulesetSet" data-arg="${s.ruleset === 'loft' ? 'classic' : 'loft'}">${t(s.ruleset === 'loft' ? 'rulesetClassic' : 'rulesetLoft')}</button></p>
-    <table class="tbl"><thead><tr><th></th><th>★</th><th class="r">${t('bestScore')}</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="tbl"><thead><tr><th></th><th>${icon('ui_star_full')}</th><th class="r">${t('bestScore')}</th></tr></thead><tbody>${rows}</tbody></table>
     <ul class="stats">
       <li><span>${t('dailyTitle')}</span><b>${daily ?? '—'}</b></li>
       <li><span>${t('endless')}</span><b>${eb.score > 0 ? t('endlessBest', { score: eb.score, wave: eb.wave }) : '—'}</b></li>
@@ -90,7 +90,7 @@ function achTab(): string {
   return `<ul class="ach-list">${ACHIEVEMENTS.map((a) => {
     const done = s.achievements[a.id] !== undefined;
     const pr = progressOf(s, a.id);
-    return `<li class="${done ? 'done' : 'locked'}"><span class="aico" aria-hidden="true">${done ? a.icon : '🔒'}</span><span class="atxt"><b>${t(('ach_' + a.id) as Key)}</b><small>${t(('achDesc_' + a.id) as Key)}${pr && !done ? ` · ${pr[0]}/${pr[1]}` : ''}</small></span><span class="areward">${t('coinsEarned', { n: a.reward })}</span></li>`;
+    return `<li class="${done ? 'done' : 'locked'}"><span class="aico" aria-hidden="true">${done ? a.icon : icon('ui_lock')}</span><span class="atxt"><b>${t(('ach_' + a.id) as Key)}</b><small>${t(('achDesc_' + a.id) as Key)}${pr && !done ? ` · ${pr[0]}/${pr[1]}` : ''}</small></span><span class="areward">${t('coinsEarned', { n: a.reward })}</span></li>`;
   }).join('')}</ul>`;
 }
 

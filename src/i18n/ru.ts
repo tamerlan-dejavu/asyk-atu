@@ -394,6 +394,9 @@ export const ru = {
   keySpace: 'Бросок / дальше',
   keyAngle: 'Угол ±1°',
   keyPower: 'Сила ±2%',
+  rarityCommon: 'Обычный',
+  rarityRare: 'Редкий',
+  rarityEpic: 'Эпический',
 } as const;
 
 export type Dict = Record<keyof typeof ru, string>;

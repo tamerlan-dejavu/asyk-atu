@@ -3,7 +3,7 @@ import { ASYK_ART, assetUrl, SAKA_ART } from '../game/render/art';
 import { t, type Key } from '../i18n';
 import { isOwned, ITEMS, type ShopCat, type ShopItem } from '../shop/catalog';
 import { store } from '../storage/save';
-import { ornament } from './common';
+import { coinIcon, ornament } from './common';
 
 export type ShopOverlay = 'none' | 'confirm' | 'got';
 
@@ -49,7 +49,10 @@ function card(it: ShopItem): string {
   else if (it.pro) action = `<span class="pill">${t('proOnly')}</span>`;
   else
     action = `<button class="btn sm primary" data-act="buyItem" data-arg="${it.id}" ${s.coins < it.price ? 'aria-disabled="true"' : ''}>${t('buy')} · ${it.price}</button>`;
-  return `<div class="scard${eq ? ' eq' : ''}">${preview(it)}<b>${t(('item_' + it.id) as Key)}</b>${action}</div>`;
+  // редкость: цвет + форма-ромб + подпись (не только цвет)
+  const rar = it.pro || it.price >= 350 ? 3 : it.price >= 150 ? 2 : 1;
+  const rarKey: Key = rar === 3 ? 'rarityEpic' : rar === 2 ? 'rarityRare' : 'rarityCommon';
+  return `<div class="scard${eq ? ' eq' : ''}">${preview(it)}<b>${t(('item_' + it.id) as Key)}</b><span class="rarity r${rar}">${t(rarKey)}</span>${action}</div>`;
 }
 
 function section(cat: ShopCat, title: Key): string {
@@ -71,7 +74,7 @@ export function shopScreen(overlay: ShopOverlay): string {
         : '';
   return `
   <section class="screen">
-    <header class="bar"><button class="btn sec sm" data-act="goto" data-arg="modes">← ${t('back')}</button><h2>${t('shopTitle')}</h2><span class="coinbadge" aria-label="${t('coins')}">🪙 ${s.coins}</span></header>
+    <header class="bar"><button class="btn sec sm" data-act="goto" data-arg="modes">← ${t('back')}</button><h2>${t('shopTitle')}</h2><span class="coinbadge" aria-label="${t('coins')}">${coinIcon()} ${s.coins}</span></header>
     ${ornament()}
     <div class="panel scroll">
       <p class="small">${t('earnHint')}</p>

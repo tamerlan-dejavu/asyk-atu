@@ -13,7 +13,8 @@ import { activatePro, buyItem, equipItem, itemById } from '../shop/catalog';
 import { CUSTOM_LIMIT, store } from '../storage/save';
 import type { BotLevel, CustomLevel, Difficulty, Lang, LoftLevel, Quality, Ruleset } from '../types';
 import { cloudKey, dailyKey as rsDailyKey, levelKey } from '../game/rules/ruleset';
-import { $, botLabel, HORN, levelName, modeLabel, ornament, playerName, sakaIcon, setHtml, stars, toast, u } from './common';
+import { $, botLabel, coinIcon, heartIcon, icon, levelName, modeLabel, ornament, playerName, setHtml, stars, toast, u } from './common';
+import { assetUrl, SAKA_ART, uiIcon } from '../game/render/art';
 import * as ed from './editor';
 import { recordsScreen, type RecordsTab } from './records';
 import { makeLink, senderName, shareCard, shareLink } from './share';
@@ -93,28 +94,37 @@ function menuScreen(): string {
         score: (rs.extra.totalScore ?? 0) + rs.round.scores[0] + (rs.mode === 'versus' || rs.mode === 'duel' ? rs.round.scores[1] : 0),
       })}</small></button>`
     : '';
+  const saka = store.data.equipped.saka;
+  const dust = Array.from(
+    { length: 14 },
+    (_, i) => `<i style="left:${(i * 37) % 100}%;animation-duration:${9 + ((i * 7) % 8)}s;animation-delay:-${(i * 1.3) % 9}s"></i>`,
+  ).join('');
   return `
   <section class="screen menu">
+    <div class="dust" aria-hidden="true">${dust}</div>
+    <div class="menu-top">
+      ${FEATURES.shop ? `<button class="skinbadge" data-act="goto" data-arg="shop" aria-label="${t('shop')}"><img src="${assetUrl(`saka/${SAKA_ART[saka] ?? 'saka_bronze'}.png`)}" alt="" aria-hidden="true"/>${t(`item_${saka}` as Key)}</button>` : '<span></span>'}
+      ${FEATURES.shop ? `<span class="coinbadge" aria-label="${t('coins')}">${coinIcon()} ${store.data.coins}</span>` : ''}
+    </div>
     <div class="title-wrap">
-      <div class="horns">${HORN}<span class="sp"></span>${HORN}</div>
+      <img class="emblem" src="${assetUrl('ui/emblem_asyk.png')}" alt="" aria-hidden="true" draggable="false"/>
       <h1>${t('title')}</h1>
       <p class="tag">${t('tagline')}</p>
     </div>
     <div class="stack">
       ${cont}
       <button class="btn ${rs ? '' : 'primary big'}" data-act="play">${t('play')}</button>
-      <button class="btn" data-act="goto" data-arg="modes">${t('modes')}</button>
-      <div class="row2">
-        <button class="btn sec" data-act="goto" data-arg="rules">${t('howTo')}</button>
-        <button class="btn sec" data-act="goto" data-arg="records">${t('records')}</button>
+      <div class="mgrid2">
+        <button class="btn sec" data-act="goto" data-arg="modes">${icon('ui_bolt')} ${t('modes')}</button>
+        <button class="btn sec" data-act="goto" data-arg="records">${icon('ui_trophy')} ${t('records')}</button>
+        <button class="btn sec" data-act="goto" data-arg="rules">${icon('ui_star_full')} ${t('howTo')}</button>
+        <button class="btn sec" data-act="goto" data-arg="settings">${icon('ui_gear')} ${t('settings')}</button>
       </div>
-      <button class="btn sec" data-act="goto" data-arg="settings">${t('settings')}</button>
     </div>
     ${FEATURES.cloud ? `<div class="menu-sync">${syncLabel()}</div>` : ''}
     <div class="menu-foot">
       <div class="chips" role="group" aria-label="${t('language')}">${langBtn('ru', 'RU')}${langBtn('kk', 'ҚАЗ')}${langBtn('en', 'EN')}</div>
       <div class="chips">
-        ${FEATURES.shop ? `<span class="coinbadge" aria-label="${t('coins')}">🪙 ${store.data.coins}</span>` : ''}
         ${FEATURES.cloud ? `<button class="chip icon${cloud.signedIn ? ' on' : ''}" data-act="goto" data-arg="profile" aria-label="${t('profile')}">👤</button>` : ''}
         <button class="chip icon${store.data.sound ? ' on' : ''}" data-act="sound" aria-pressed="${store.data.sound}" aria-label="${t('sound')}">${store.data.sound ? '🔊' : '🔇'}</button>
         ${isWide() && fullscreenSupported() ? `<button class="chip icon${document.fullscreenElement ? ' on' : ''}" data-act="fullscreen" aria-pressed="${!!document.fullscreenElement}" aria-label="${t('fullscreen')} (F)">⛶</button>` : ''}
@@ -139,9 +149,9 @@ function modesScreen(): string {
       ${card('goto', 'daily', '📅', 'daily', 'modeDailyDesc', db !== undefined ? ` · ${t('best')}: ${db}` : '')}
       ${FEATURES.editor ? card('editorNew', '', '✏', 'editor', 'modeEditorDesc') : ''}
       ${FEATURES.editor ? card('goto', 'mine', '📂', 'myLevels', 'modeMineDesc', ` · ${store.data.customLevels.length}/${CUSTOM_LIMIT}`) : ''}
-      ${card('loftPlay', '', '🎯', 'rulesetLoft', 'modeLoftDesc')}
-      ${FEATURES.cloud ? card('goto', 'board', '🏆', 'leaderboard', 'modeBoardDesc') : ''}
-      ${FEATURES.shop ? card('goto', 'shop', '🪙', 'shop', 'modeShopDesc', ` · ${store.data.coins}`) : ''}
+      ${card('loftPlay', '', icon('ui_bolt'), 'rulesetLoft', 'modeLoftDesc')}
+      ${FEATURES.cloud ? card('goto', 'board', icon('ui_trophy'), 'leaderboard', 'modeBoardDesc') : ''}
+      ${FEATURES.shop ? card('goto', 'shop', coinIcon(), 'shop', 'modeShopDesc', ` · ${store.data.coins}`) : ''}
     </div>
   </section>`;
 }
@@ -153,7 +163,7 @@ function levelCard(l: { id: number; throws: number; par: number | null }, open: 
     <button class="card${open ? '' : ' locked'}" data-act="level" data-arg="${l.id}" ${open ? '' : 'disabled'} aria-label="${t('levelN', { n: l.id })}: ${levelName(l.id)}${open ? '' : ' — ' + t('locked')}">
       <span class="num">${l.id === 0 ? '★' : l.id}</span>
       <span class="cname">${levelName(l.id)}</span>
-      ${open ? stars(st?.stars ?? 0) : `<span class="lock" aria-hidden="true">🔒</span>`}
+      ${open ? stars(st?.stars ?? 0) : icon('ui_lock', 'lock')}
       <span class="cmeta">${open ? meta : t('locked')}</span>
       <span class="cbest">${open && st ? `${t('best')}: ${st.best}` : ''}</span>
     </button>`;
@@ -336,7 +346,7 @@ function rulesScreen(): string {
       ${block(svgOut, 'rulesOut', 'rulesOutText')}
       <article class="rule"><div class="illus-text" aria-hidden="true">10<br>25<br>40</div><div><h3>${t('rulesScore')}</h3><p>${t('rulesScoreText')}</p></div></article>
       ${block(svgTypes, 'rulesValuesTitle', 'rulesValues')}
-      <article class="rule"><div class="illus-text" aria-hidden="true">★★★</div><div><h3>${t('rulesStars')}</h3><p>${t('rulesStarsText')}</p></div></article>
+      <article class="rule"><div class="illus-text" aria-hidden="true">${stars(3)}</div><div><h3>${t('rulesStars')}</h3><p>${t('rulesStarsText')}</p></div></article>
       <article class="rule"><div class="illus-text" aria-hidden="true">1 ⇄ 2</div><div><h3>${t('rulesVersus')}</h3><p>${t('rulesVersusText')}</p></div></article>
     </div>
   </section>`;
@@ -405,14 +415,14 @@ function hudCore(): string {
       const active = h.player === i;
       const left = h.versusLeft[i];
       let ic = '';
-      for (let k = 0; k < 6; k++) ic += sakaIcon(k < left);
+      for (let k = 0; k < 6; k++) ic += heartIcon(k < left);
       return `<div class="pchip p${i + 1}${active ? ' active' : ''}"><b class="pn">${u(playerName(i, h.mode, h.botLevel))}</b><span class="ps">${h.scores[i]}</span><span class="icons">${ic}</span></div>`;
     };
     return `<div class="hud versus"><button class="btn icon-btn" data-act="pause" aria-label="${t('pause')}">❚❚</button>${chip(0)}${chip(1)}</div>`;
   }
   let icons = '';
   if (Number.isFinite(h.throwsTotal) && h.throwsTotal <= 16) {
-    for (let k = 0; k < h.throwsTotal; k++) icons += sakaIcon(k < h.throwsLeft);
+    for (let k = 0; k < h.throwsTotal; k++) icons += heartIcon(k < h.throwsLeft);
   } else if (Number.isFinite(h.throwsTotal)) {
     icons = `<span class="inf small">${h.throwsLeft} / ${h.throwsTotal}</span>`;
   } else icons = `<span class="inf">${t('unlimited')}</span>`;
@@ -484,7 +494,7 @@ function pauseModal(): string {
 }
 
 function coinsLine(r: ResultData): string {
-  return r.coins > 0 && FEATURES.shop ? `<p class="coins">🪙 ${t('coinsEarned', { n: r.coins })}</p>` : '';
+  return r.coins > 0 && FEATURES.shop ? `<p class="coins">${coinIcon()} ${t('coinsEarned', { n: r.coins })}</p>` : '';
 }
 
 function resultModal(r: ResultData): string {
@@ -702,6 +712,7 @@ function renderModal(): void {
 function renderAll(): void {
   const rot = document.getElementById('rotate');
   if (rot) rot.textContent = '↻ ' + t('rotate');
+  document.documentElement.dataset.quality = store.data.quality;
   renderScreen();
   renderHud();
   renderModal();
@@ -1316,7 +1327,23 @@ function onKey(e: KeyboardEvent): void {
   }
 }
 
+/**
+ * Иконки интерфейса и начертания шрифтов подгружаются сразу после старта: иначе браузер запросит их лениво
+ * (при первом показе экрана) — и без сети экран уровней остался бы без звёзд и замков.
+ */
+function warmUp(): void {
+  for (const n of ['ui_coin', 'ui_heart', 'ui_star_full', 'ui_star_empty', 'ui_lock', 'ui_trophy', 'ui_bolt', 'ui_gear']) {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = uiIcon(n);
+  }
+  const sample = 'Aa Аа Әә Ққ';
+  const faces = ['700 16px "Montserrat Alternates"', '800 16px "Montserrat Alternates"', '400 16px Nunito', '700 16px Nunito', '800 16px Nunito'];
+  if (document.fonts?.load) for (const f of faces) void document.fonts.load(f, sample).catch(() => undefined);
+}
+
 export function initUI(): void {
+  warmUp();
   const root = $('ui');
   root.innerHTML = `<div id="screen"></div><div id="hud"></div><div id="hint"></div><div id="floats"></div><div id="banner" role="status"></div><div id="modal"></div><div id="toast" role="status"></div><div id="ach" role="status"></div>`;
 

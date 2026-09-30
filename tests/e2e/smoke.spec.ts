@@ -61,7 +61,10 @@ test('открыть → Играть → уровень 1 → бросок → 
 test('без сети игра работает и не пишет ошибок', async ({ page, context }) => {
   const errors = collectErrors(page);
   await seed(page);
-  await page.goto('/');
+  // игра загрузилась полностью (картинки, шрифты), после этого сеть пропадает
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await page.waitForFunction(() => (window as any).__asyk?.state === 'MENU');
+  await page.waitForLoadState('networkidle');
   await context.setOffline(true);
   const { before, after } = await oneThrow(page);
   expect(after).toBe(before - 1);

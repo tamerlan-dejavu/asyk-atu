@@ -312,10 +312,10 @@ export class GameScene extends Phaser.Scene {
     const q = this.quality3d();
     if (want && this.view3d && fromSettings && q !== this.view3dQuality) {
       this.disable3D();
-      void this.enable3D();
+      void this.enable3D(true);
       return;
     }
-    if (want && !this.view3d) void this.enable3D();
+    if (want && !this.view3d) void this.enable3D(fromSettings);
     else if (!want && this.view3d) this.disable3D();
   }
 
@@ -324,14 +324,15 @@ export class GameScene extends Phaser.Scene {
     return q === 'low' || (q === 'auto' && this.autoLow) ? 'low' : 'high';
   }
 
-  private async enable3D(): Promise<void> {
+  /** announce — показать «Загружаем 3D…» (только при ручном включении; при запуске 3D грузится молча). */
+  private async enable3D(announce = false): Promise<void> {
     if (this.view3d || this.view3dLoading) return;
     if (!hasWebGLQuick()) {
       this.fallback2D('view3dNoWebgl');
       return;
     }
     this.view3dLoading = true;
-    bus.emit('toast', { key: 'view3dLoading' });
+    if (announce) bus.emit('toast', { key: 'view3dLoading' });
     const quality = this.quality3d();
     const th = themePal(store.data.equipped.theme);
     try {

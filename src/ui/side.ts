@@ -7,7 +7,7 @@ import type { GameState } from '../game/rules/turnState';
 import { t, type Key } from '../i18n';
 import { isOwned, ITEMS } from '../shop/catalog';
 import { store } from '../storage/save';
-import { levelName, modeLabel, playerName, sakaIcon, stars, u } from './common';
+import { coinIcon, heartIcon, levelName, modeLabel, playerName, stars, u } from './common';
 
 /**
  * Боковые панели десктопа (DOM поверх страницы, не внутри canvas). На телефоне не показываются —
@@ -54,7 +54,7 @@ export function leftPanel(c: SideCtx): string {
     const left = two ? h.versusLeft[i] : h.throwsLeft;
     const total = two ? 6 : h.throwsTotal;
     let ic = '';
-    if (Number.isFinite(total) && total <= 16) for (let k = 0; k < total; k++) ic += sakaIcon(k < left);
+    if (Number.isFinite(total) && total <= 16) for (let k = 0; k < total; k++) ic += heartIcon(k < left);
     else if (Number.isFinite(total)) ic = `<span class="small">${left} / ${total}</span>`;
     else ic = `<span class="inf">${t('unlimited')}</span>`;
     const active = two && h.player === i;
@@ -134,7 +134,7 @@ export function rightPanel(c: SideCtx): string {
       : `<div class="sblock"><h3>${t('sideBest')}</h3><p class="sbest">${best || `<span class="small">${t('sideNoBest')}</span>`}</p></div>`;
   const got = ACHIEVEMENTS.filter((a) => (s.achievements[a.id] ?? 0) > 0);
   const extras = [
-    FEATURES.shop ? `<span class="coinbadge" aria-label="${t('coins')}">🪙 ${s.coins}</span>` : '',
+    FEATURES.shop ? `<span class="coinbadge" aria-label="${t('coins')}">${coinIcon()} ${s.coins}</span>` : '',
     FEATURES.achievements
       ? `<span class="achbadge" title="${t('achievements')}">${t('achievements')}: <b>${got.length} / ${ACHIEVEMENTS.length}</b> <span aria-hidden="true">${got
           .slice(-4)

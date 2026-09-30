@@ -398,4 +398,7 @@ export const kk: Dict = {
   keySpace: 'Лақтыру / әрі қарай', // verify: native speaker
   keyAngle: 'Бұрыш ±1°', // verify: native speaker
   keyPower: 'Күш ±2%', // verify: native speaker
+  rarityCommon: 'Қарапайым', // verify: native speaker
+  rarityRare: 'Сирек', // verify: native speaker
+  rarityEpic: 'Эпикалық', // verify: native speaker
 };

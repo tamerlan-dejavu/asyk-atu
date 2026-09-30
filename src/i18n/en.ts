@@ -396,4 +396,7 @@ export const en: Dict = {
   keySpace: 'Throw / next',
   keyAngle: 'Angle ±1°',
   keyPower: 'Power ±2%',
+  rarityCommon: 'Common',
+  rarityRare: 'Rare',
+  rarityEpic: 'Epic',
 };

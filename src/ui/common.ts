@@ -1,6 +1,7 @@
 import { t, type Key } from '../i18n';
 import { store } from '../storage/save';
 import type { BotLevel, GameMode } from '../types';
+import { uiIcon } from '../game/render/art';
 
 export const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -10,13 +11,21 @@ export const esc = (s: string): string =>
 export const HORN = `<svg class="horn" viewBox="0 0 40 30" aria-hidden="true"><path d="M2 15 C12 14 20 8 15 3 C11 0 7 6 11 8 M2 15 C10 20 18 22 19 28 C19 32 12 32 12 27" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>`;
 export const ornament = (): string => `<div class="orn" aria-hidden="true"></div>`;
 
-export function sakaIcon(filled: boolean): string {
-  return `<svg class="ico${filled ? '' : ' used'}" viewBox="0 0 30 18" aria-hidden="true"><polygon points="1,9 8,1 22,1 29,9 22,17 8,17" fill="${filled ? '#aab4bf' : 'none'}" stroke="${filled ? '#11171c' : '#f6ecd0'}" stroke-width="2"/>${filled ? '<line x1="8" y1="9" x2="22" y2="9" stroke="#16a5a3" stroke-width="2.4"/>' : ''}</svg>`;
+/** Иконка из пака (public/assets/ui). Без подписи — декоративная (скрыта от экранного диктора). */
+export function icon(name: string, cls = 'uic', label = ''): string {
+  return `<img class="${cls}" src="${uiIcon(name)}" alt="${label}"${label ? '' : ' aria-hidden="true"'} draggable="false" decoding="async"/>`;
+}
+export const coinIcon = (): string => icon('ui_coin');
+
+/** Попытка (бросок): полное сердце — осталась, тусклое — использована (отличаются и формой прозрачности, и цветом). */
+export function heartIcon(filled: boolean): string {
+  return icon('ui_heart', `ico heart${filled ? '' : ' used'}`);
 }
 
 export function stars(n: number, big = false): string {
   let out = `<span class="stars${big ? ' big' : ''}" role="img" aria-label="${n} / 3">`;
-  for (let i = 0; i < 3; i++) out += `<span class="star${i < n ? ' on' : ''}" style="--i:${i}">★</span>`;
+  for (let i = 0; i < 3; i++)
+    out += `<img class="sti${i < n ? ' on' : ''}" style="--i:${i}" src="${uiIcon(i < n ? 'ui_star_full' : 'ui_star_empty')}" alt="" aria-hidden="true" draggable="false"/>`;
   return out + '</span>';
 }
 

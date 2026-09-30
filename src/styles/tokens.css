@@ -1,0 +1,91 @@
+/* Дизайн-токены «Асық ату»: единственный источник цветов, шрифтов, радиусов, теней, отступов и движения.
+   Стиль: казахский орнамент + тёплое золото + глубина. Значения повторены в src/ui/tokens.ts (для canvas). */
+:root {
+  /* палитра: ночной индиго (фон), золото (акцент), терракота и бирюза (вторичные), кремовый текст */
+  --c-night-950: #0b0e26;
+  --c-night-900: #11163a;
+  --c-night-800: #182050;
+  --c-night-700: #232d68;
+  --c-night-600: #313d84;
+  --c-gold-200: #fff0bf;
+  --c-gold-300: #ffe08a;
+  --c-gold-400: #ffcf4a;
+  --c-gold-500: #f2b01e;
+  --c-gold-600: #c98410;
+  --c-gold-800: #6e4506;
+  --c-terra-400: #e0764d;
+  --c-terra-500: #c4532c;
+  --c-terra-700: #7e2f16;
+  --c-turq-300: #7fe3dc;
+  --c-turq-400: #2cc4bf;
+  --c-turq-500: #16a5a3;
+  --c-turq-700: #0b6664;
+  --c-cream-50: #fffaf0;
+  --c-cream-100: #f7edd3;
+  --c-cream-300: #e3d0a2;
+  --c-cream-500: #b9a57a;
+  --c-danger-500: #e0473b;
+  --c-danger-700: #9c2419;
+
+  /* семантика (контраст текста к фону ≥ 4.5:1) */
+  --bg: var(--c-night-900);
+  --bg-deep: var(--c-night-950);
+  --surface: rgba(24, 32, 80, 0.82);
+  --surface-strong: rgba(17, 22, 58, 0.94);
+  --surface-raised: rgba(49, 61, 132, 0.55);
+  --surface-solid: var(--c-night-800);
+  --border: rgba(255, 207, 74, 0.55);
+  --border-soft: rgba(247, 237, 211, 0.18);
+  --text: var(--c-cream-100);
+  --text-dim: #cbbf9f;
+  --text-on-gold: #3a2303;
+  --accent: var(--c-gold-400);
+  --accent-2: var(--c-turq-400);
+  --accent-3: var(--c-terra-500);
+
+  /* шрифты: заголовки с характером + текст; оба с кириллицей и казахскими буквами (cyrillic-ext) */
+  --font-display: 'Montserrat Alternates', 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* шкала 12/14/16/20/28/40 — в em: интерфейс масштабируется вместе с полем */
+  --fs-12: 0.75em;
+  --fs-14: 0.875em;
+  --fs-16: 1em;
+  --fs-20: 1.25em;
+  --fs-28: 1.75em;
+  --fs-40: 2.5em;
+
+  /* отступы 4/8/12/16/24 */
+  --sp-4: 0.25em;
+  --sp-8: 0.5em;
+  --sp-12: 0.75em;
+  --sp-16: 1em;
+  --sp-24: 1.5em;
+
+  --r-sm: 0.5em;
+  --r-md: 0.8em;
+  --r-lg: 1.15em;
+  --r-pill: 999px;
+
+  /* тени с цветным (индиго) оттенком, три уровня; золотое свечение для выбранного */
+  --sh-1: 0 0.12em 0.3em rgba(8, 10, 40, 0.45);
+  --sh-2: 0 0.35em 0.9em rgba(8, 10, 40, 0.55), 0 0.1em 0.2em rgba(8, 10, 40, 0.4);
+  --sh-3: 0 0.9em 2.2em rgba(6, 8, 32, 0.65), 0 0.25em 0.5em rgba(6, 8, 32, 0.45);
+  --glow-gold: 0 0 0 0.12em var(--c-gold-400), 0 0 1em rgba(255, 207, 74, 0.55);
+  --glow-turq: 0 0 0 0.12em var(--c-turq-400), 0 0 0.9em rgba(44, 196, 191, 0.5);
+
+  /* движение */
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.3, 1.45, 0.45, 1);
+
+  --tap: 44px;
+  --blur: 10px;
+}
+
+/* низкое качество: без размытия (дорого на слабой графике) */
+:root[data-quality='low'] {
+  --blur: 0px;
+  --surface: rgba(20, 26, 66, 0.96);
+}
