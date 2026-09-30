@@ -324,7 +324,9 @@ export class ThreeView {
             : type === 'block'
               ? { metalness: 0, roughness: 0.9 }
               : { metalness: 0, roughness: 0.6 };
-    const cap = new MeshStandardMaterial({ map, ...look });
+    // золото без карты окружения выглядит тёмным — лёгкое собственное свечение возвращает «блеск»
+    const glow = type === 'golden' ? { emissive: new Color(0x6a4a00), emissiveIntensity: 0.45 } : {};
+    const cap = new MeshStandardMaterial({ map, ...look, ...glow });
     const side = new MeshStandardMaterial({ color: canvas ? this.edgeColor(canvas, kind) : 0x6b5a44, ...look });
     const out = [cap, side];
     this.mats.set(key, out);

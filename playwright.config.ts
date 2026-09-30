@@ -14,6 +14,8 @@ export default defineConfig({
     viewport: { width: 390, height: 844 },
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
+    // программный WebGL в headless-браузере (для 3D-вида); цифры FPS здесь не показательны
+    launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
     // обход защиты preview-деплоев Vercel (секрет «Protection Bypass for Automation»)
     extraHTTPHeaders: process.env.VERCEL_BYPASS
       ? { 'x-vercel-protection-bypass': process.env.VERCEL_BYPASS, 'x-vercel-set-bypass-cookie': 'true' }
