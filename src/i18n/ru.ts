@@ -368,6 +368,27 @@ export const ru = {
   achDesc_designer: 'Поделиться своим испытанием',
   ach_daily3: 'Постоянство',
   achDesc_daily3: '3 дня подряд ежедневное испытание',
+  // десктоп: боковые панели и горячие клавиши
+  sideGame: 'Игра',
+  sideControls: 'Управление',
+  sideThrowN: 'Бросок {n} из {m}',
+  sideRoundN: 'Раунд {n} из {m}',
+  sideTurn: 'Ходит',
+  sideKnocked: 'Выбитые асыки',
+  sideBest: 'Лучший результат',
+  sideNoBest: 'Пока нет',
+  sideTheme: 'Площадка',
+  achievements: 'Достижения',
+  fullscreen: 'Полный экран',
+  fullscreenExit: 'Выйти из полного экрана',
+  restartAsk: 'Начать раунд заново?',
+  restartConfirm: 'Очки и броски этого раунда пропадут.',
+  keyDrag: 'Зажми мышью у сақа, потяни назад и отпусти — бросок',
+  keyCancel: 'Отменить натяжение',
+  keyRightClick: 'ПКМ',
+  keySpace: 'Бросок / дальше',
+  keyAngle: 'Угол ±1°',
+  keyPower: 'Сила ±2%',
 } as const;
 
 export type Dict = Record<keyof typeof ru, string>;

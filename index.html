@@ -12,10 +12,16 @@
     <title>Асық ату</title>
   </head>
   <body>
-    <div id="stage">
-      <div id="game"></div>
-      <div id="ui"></div>
+    <div id="backdrop" aria-hidden="true"><canvas width="48" height="72"></canvas></div>
+    <div id="shell">
+      <aside id="side-l" class="side"></aside>
+      <div id="stage">
+        <div id="game"></div>
+        <div id="ui"></div>
+      </div>
+      <aside id="side-r" class="side"></aside>
     </div>
+    <div id="overlay"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

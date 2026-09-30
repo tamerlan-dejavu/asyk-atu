@@ -23,7 +23,7 @@ async function seed(page: Page): Promise<void> {
 }
 
 /** Холст Phaser (ввод и интерфейс); в 3D под ним есть ещё холст Three.js. */
-const gameCanvas = (page: Page) => page.locator('canvas:not(.three-canvas)');
+const gameCanvas = (page: Page) => page.locator('#game canvas:not(.three-canvas)');
 
 const state = (page: Page) => page.evaluate(() => (window as any).__asyk?.state as string | undefined);
 

@@ -1,0 +1,410 @@
+/* ================= Десктоп и планшет: оболочка вокруг поля =================
+   На телефоне (data-layout = 'phone') всё ниже не действует: #shell прозрачен для раскладки,
+   панели, подложка и слой меню скрыты — поле, HUD и меню остаются как были. */
+#backdrop,
+#overlay,
+.side {
+  display: none;
+}
+#shell {
+  display: contents;
+}
+.side[hidden] {
+  display: none !important;
+}
+
+:root[data-layout='desktop'],
+:root[data-layout='compact'] {
+  --pad: 16px;
+  --gap: clamp(12px, 1.4vw, 28px);
+  --side: 260px;
+}
+:root[data-layout='compact'] {
+  --pad: 12px;
+  --gap: 12px;
+  --side: 300px;
+}
+:root[data-layout='desktop'] body,
+:root[data-layout='compact'] body {
+  display: block;
+  background: #1e1006;
+}
+
+/* Подложка: размытая и затемнённая на 35 % копия текущей карты; до первой отрисовки — тёплый градиент.
+   Размытие «запечено» в крошечный холст (48×72, растягивается браузером со сглаживанием — эквивалент blur ≈ 24 px):
+   CSS-фильтр на весь экран вдвое снижал FPS на слабой графике. */
+:root[data-layout='desktop'] #backdrop,
+:root[data-layout='compact'] #backdrop {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, #6e4424, #2a160a 80%);
+}
+#backdrop canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(20, 10, 4, 0.55));
+}
+
+/* Три колонки: панель · поле · панель. Поле вписано по высоте окна с отступом, без скролла страницы. */
+:root[data-layout='desktop'] #shell {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(var(--side), 1fr) auto minmax(var(--side), 1fr);
+  align-items: center;
+  column-gap: var(--gap);
+  padding: var(--pad) calc(var(--pad) + env(safe-area-inset-right, 0px)) var(--pad) calc(var(--pad) + env(safe-area-inset-left, 0px));
+}
+:root[data-layout='desktop'] #stage {
+  --sh: min(calc(100dvh - 2 * var(--pad)), calc((100vw - 2 * var(--side) - 2 * var(--gap) - 2 * var(--pad)) * 1.5));
+  grid-column: 2;
+  width: calc(var(--sh) * 2 / 3);
+  height: var(--sh);
+  border-radius: 10px;
+}
+:root[data-layout='desktop'] .side {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  max-height: calc(100dvh - 2 * var(--pad));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  font-size: 15px;
+}
+:root[data-layout='desktop'] #side-l {
+  grid-column: 1;
+  justify-self: end;
+}
+:root[data-layout='desktop'] #side-r {
+  grid-column: 3;
+  justify-self: start;
+}
+
+/* Планшет / небольшое окно (ландшафт < 1024): поле + одна колонка панелей справа, поле ≥ 70 % высоты */
+:root[data-layout='compact'] #shell {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto minmax(200px, var(--side));
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-content: center;
+  column-gap: var(--gap);
+  row-gap: 10px;
+  padding: var(--pad);
+}
+:root[data-layout='compact'] #stage {
+  --sh: min(calc(100dvh - 2 * var(--pad)), calc((100vw - var(--side) - var(--gap) - 2 * var(--pad)) * 1.5));
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: calc(var(--sh) * 2 / 3);
+  height: var(--sh);
+  border-radius: 8px;
+}
+:root[data-layout='compact'] .side {
+  display: block;
+  grid-column: 2;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  font-size: 13px;
+}
+:root[data-layout='compact'] #side-l {
+  grid-row: 1;
+}
+:root[data-layout='compact'] #side-r {
+  grid-row: 2;
+  align-self: start;
+  max-height: 100%;
+}
+
+/* HUD над полем на широком экране не нужен: всё это есть в панелях (кнопки высоты броска остаются у поля) */
+:root[data-layout='desktop'] #hud .hud,
+:root[data-layout='compact'] #hud .hud {
+  display: none;
+}
+
+/* ---------- панели ---------- */
+.spanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9em;
+  padding: 1.1em;
+  border-radius: 14px;
+  background: rgba(43, 26, 14, 0.86);
+  border: 2px solid rgba(246, 236, 208, 0.22);
+  box-shadow: 0 0.6em 1.8em rgba(0, 0, 0, 0.45);
+  color: var(--cream);
+  pointer-events: auto;
+}
+.spanel h3 {
+  margin: 0 0 0.45em;
+  font-size: 0.78em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5em;
+}
+.spanel p {
+  margin: 0;
+}
+.shead {
+  display: flex;
+  gap: 0.7em;
+  align-items: center;
+}
+.stitle {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.stitle small {
+  opacity: 0.75;
+  font-size: 0.8em;
+}
+.stitle b {
+  font-size: 1.1em;
+  line-height: 1.2;
+}
+.sround {
+  font-weight: 700;
+  color: #ffd35a;
+}
+.splayers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+.splayer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.3em 0.6em;
+  padding: 0.6em 0.75em;
+  border-radius: 0.7em;
+  background: rgba(14, 127, 125, 0.35);
+  border: 2px solid transparent;
+}
+.splayer.p1 + .splayer.p2,
+.splayers:has(.p2) .splayer.p1 {
+  background: #0b6664;
+}
+.splayer.p2 {
+  background: #83381d;
+}
+.splayer.active {
+  border-color: #ffd35a;
+  box-shadow: 0 0 0.8em rgba(255, 211, 90, 0.55);
+}
+.splayer .pn {
+  display: flex;
+  flex-direction: column;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.splayer .pn small {
+  color: #ffd35a;
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.splayer .ps {
+  font-size: 2em;
+  line-height: 1;
+}
+.splayer .icons {
+  grid-column: 1 / -1;
+}
+.splayer .ico {
+  width: 1.5em;
+  height: 0.9em;
+}
+.snum {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 800;
+}
+.inv {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em;
+}
+.inv .ico.asyk {
+  width: 1.9em;
+  height: 1.15em;
+}
+.skeys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  font-size: 0.92em;
+}
+.skeys li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8em;
+}
+.skeys li.wide {
+  display: block;
+  opacity: 0.9;
+  margin-bottom: 0.2em;
+}
+.skeys .keys {
+  display: inline-flex;
+  gap: 0.25em;
+  flex: none;
+}
+kbd {
+  display: inline-block;
+  min-width: 1.8em;
+  padding: 0.1em 0.45em;
+  border-radius: 0.35em;
+  border: 1px solid rgba(246, 236, 208, 0.55);
+  border-bottom-width: 2px;
+  background: rgba(246, 236, 208, 0.1);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.85em;
+  text-align: center;
+}
+.sbest {
+  font-size: 1.3em;
+  font-weight: 800;
+}
+.sbest .stars {
+  font-size: 0.8em;
+  vertical-align: 0.05em;
+}
+.sbest .star {
+  color: rgba(246, 236, 208, 0.35);
+}
+.sbest .star.on {
+  color: #ffd35a;
+}
+.sextras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  align-items: center;
+}
+.achbadge {
+  display: inline-flex;
+  gap: 0.35em;
+  align-items: center;
+  padding: 0.2em 0.7em;
+  border-radius: 2em;
+  background: rgba(14, 127, 125, 0.45);
+  border: 1px solid rgba(246, 236, 208, 0.35);
+  font-size: 0.9em;
+}
+.sset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+}
+.sset h3 {
+  margin: 0.3em 0 0;
+}
+.srow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45em;
+}
+.spanel .chip {
+  min-height: 2.2em;
+  font-size: 0.9em;
+}
+.spanel .btn.sm {
+  min-height: 2.3em;
+  font-size: 0.92em;
+}
+.spanel .icon-btn {
+  flex: none;
+}
+
+/* ---------- меню на широком экране: отдельный слой по центру окна, контейнер до 960 px ---------- */
+:root[data-layout='desktop'] #overlay,
+:root[data-layout='compact'] #overlay {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  font-size: 17px;
+  color: var(--ink);
+}
+:root[data-layout='compact'] #overlay {
+  font-size: 15px;
+}
+#overlay #screen {
+  position: absolute;
+  inset: 0;
+}
+#overlay #screen.shown {
+  pointer-events: auto;
+  background: rgba(30, 16, 6, 0.62);
+}
+#overlay .screen {
+  inset: 24px 0;
+  margin: 0 auto;
+  width: min(960px, calc(100% - 48px));
+  padding: 0;
+}
+#overlay .menu {
+  padding-top: 4vh;
+}
+#overlay .stack {
+  width: min(440px, 100%);
+  margin: 0 auto;
+  padding: 0;
+}
+#overlay .grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+#overlay .mgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+}
+#overlay .sgrid {
+  grid-template-columns: repeat(auto-fill, minmax(9em, 1fr));
+}
+:root[data-layout='compact'] #overlay .grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+:root[data-layout='compact'] #overlay .mgrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+#overlay .card:hover:not(.locked),
+#overlay .mcard:hover {
+  filter: brightness(1.05);
+}
+#overlay #toast,
+#overlay #ach {
+  left: 50%;
+  right: auto;
+  width: min(460px, 90vw);
+  transform: translate(-50%, -0.4em);
+}
+#overlay #toast.show,
+#overlay #ach.show {
+  transform: translate(-50%, 0);
+}

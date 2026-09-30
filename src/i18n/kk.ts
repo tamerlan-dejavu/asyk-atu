@@ -372,4 +372,25 @@ export const kk: Dict = {
   achDesc_designer: 'Өз сынағыңмен бөлісу', // verify: native speaker
   ach_daily3: 'Тұрақтылық', // verify: native speaker
   achDesc_daily3: 'Күнделікті сынақ қатарынан 3 күн', // verify: native speaker
+  // десктоп: боковые панели и горячие клавиши
+  sideGame: 'Ойын', // verify: native speaker
+  sideControls: 'Басқару', // verify: native speaker
+  sideThrowN: '{m} лақтырудың {n}-сі', // verify: native speaker
+  sideRoundN: '{m} раундтың {n}-сі', // verify: native speaker
+  sideTurn: 'Кезек', // verify: native speaker
+  sideKnocked: 'Ұтылған асықтар', // verify: native speaker
+  sideBest: 'Үздік нәтиже', // verify: native speaker
+  sideNoBest: 'Әзірге жоқ', // verify: native speaker
+  sideTheme: 'Алаң', // verify: native speaker
+  achievements: 'Жетістіктер', // verify: native speaker
+  fullscreen: 'Толық экран', // verify: native speaker
+  fullscreenExit: 'Толық экраннан шығу', // verify: native speaker
+  restartAsk: 'Раундты қайта бастау керек пе?', // verify: native speaker
+  restartConfirm: 'Осы раундтағы ұпайлар мен лақтырулар жойылады.', // verify: native speaker
+  keyDrag: 'Сақаның жанынан тышқанмен басып, артқа тарт та, жібер — лақтыру', // verify: native speaker
+  keyCancel: 'Тартуды болдырмау', // verify: native speaker
+  keyRightClick: 'Оң батырма', // verify: native speaker
+  keySpace: 'Лақтыру / әрі қарай', // verify: native speaker
+  keyAngle: 'Бұрыш ±1°', // verify: native speaker
+  keyPower: 'Күш ±2%', // verify: native speaker
 };

@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import './ui/styles.css';
+import './ui/desktop.css';
 import { GameScene } from './game/GameScene';
 import { FIELD_H, FIELD_W } from './game/config';
 import { initUI } from './ui/ui';
+import { initLayout, isWide } from './ui/layout';
 import { setLang } from './i18n';
 import { store } from './storage/save';
 import { cloud } from './cloud/cloud';
@@ -13,8 +15,14 @@ logBuild();
 initErrorReporting();
 setLang(store.data.lang);
 
-// devicePixelRatio ограничен 2: чёткая картинка на HiDPI без лишней нагрузки на телефоны.
-const S = Math.min(2, window.devicePixelRatio || 1);
+// Раскладка (телефон / планшет / десктоп) — до создания игры: от неё зависит разрешение холста.
+initLayout(() => game.scale.refresh());
+
+// Разрешение холста ограничено 2: чёткая картинка на HiDPI без лишней нагрузки на телефоны.
+// На телефоне — devicePixelRatio, как раньше. На широком экране поле вписывается по высоте окна,
+// поэтому берём не меньше высоты экрана в физических пикселях (иначе на 1440p/4K картинка растягивается).
+const dpr = window.devicePixelRatio || 1;
+const S = isWide() ? Math.min(2, Math.max(dpr, ((window.screen?.height || window.innerHeight) * dpr) / FIELD_H)) : Math.min(2, dpr);
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,

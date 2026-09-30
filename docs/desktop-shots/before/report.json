@@ -1,0 +1,114 @@
+{
+  "desktop-1920x1080": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 100,
+    "field": {
+      "x": 600,
+      "y": 0,
+      "w": 720,
+      "h": 1080
+    },
+    "errors": []
+  },
+  "desktop-1440x900": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 100,
+    "field": {
+      "x": 420,
+      "y": 0,
+      "w": 600,
+      "h": 900
+    },
+    "errors": []
+  },
+  "desktop-1366x768": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 100,
+    "field": {
+      "x": 427,
+      "y": 0,
+      "w": 512,
+      "h": 768
+    },
+    "errors": []
+  },
+  "desktop-2560x1440": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 100,
+    "field": {
+      "x": 800,
+      "y": 0,
+      "w": 960,
+      "h": 1440
+    },
+    "errors": []
+  },
+  "tablet-1024x768": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 100,
+    "field": {
+      "x": 256,
+      "y": 0,
+      "w": 512,
+      "h": 768
+    },
+    "errors": []
+  },
+  "tablet-768x1024": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 100,
+    "field": {
+      "x": 43,
+      "y": 0,
+      "w": 683,
+      "h": 1024
+    },
+    "errors": []
+  },
+  "phone-390x844": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 69.3,
+    "field": {
+      "x": 0,
+      "y": 130,
+      "w": 390,
+      "h": 585
+    },
+    "errors": []
+  },
+  "phone-360x740": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 73,
+    "field": {
+      "x": 0,
+      "y": 100,
+      "w": 360,
+      "h": 540
+    },
+    "errors": []
+  }
+}

@@ -100,6 +100,8 @@ export interface BusEvents {
   hint: { type: 'golden' | 'heavy' | 'block' | 'loft' };
   achievement: { id: string };
   toast: { key: Key; params?: Record<string, string | number> };
+  /** текстуры текущей карты — для размытой подложки вокруг поля на широком экране */
+  backdrop: { ground: CanvasImageSource; far: CanvasImageSource | null };
 }
 
 type Handler<T> = (payload: T) => void;

@@ -18,6 +18,8 @@ import * as ed from './editor';
 import { recordsScreen, type RecordsTab } from './records';
 import { makeLink, senderName, shareCard, shareLink } from './share';
 import { shopScreen, type ShopOverlay } from './shop';
+import { fullscreenSupported, leftPanel, rightPanel, toggleFullscreen } from './side';
+import { isWide, onLayout } from './layout';
 import { cloud, type BoardRow } from '../cloud/cloud';
 import {
   aboutBlock,
@@ -57,6 +59,8 @@ let result: ResultData | null = null;
 let training = false;
 let confirmReset = false;
 let confirmQuit = false;
+/** R во время раунда: подтверждение перезапуска (игра на паузе) */
+let confirmRestart = false;
 let confirmDeleteId: string | null = null;
 let recordsTab: RecordsTab = 'levels';
 let shopOverlay: ShopOverlay = 'none';
@@ -113,6 +117,7 @@ function menuScreen(): string {
         ${FEATURES.shop ? `<span class="coinbadge" aria-label="${t('coins')}">🪙 ${store.data.coins}</span>` : ''}
         ${FEATURES.cloud ? `<button class="chip icon${cloud.signedIn ? ' on' : ''}" data-act="goto" data-arg="profile" aria-label="${t('profile')}">👤</button>` : ''}
         <button class="chip icon${store.data.sound ? ' on' : ''}" data-act="sound" aria-pressed="${store.data.sound}" aria-label="${t('sound')}">${store.data.sound ? '🔊' : '🔇'}</button>
+        ${isWide() && fullscreenSupported() ? `<button class="chip icon${document.fullscreenElement ? ' on' : ''}" data-act="fullscreen" aria-pressed="${!!document.fullscreenElement}" aria-label="${t('fullscreen')} (F)">⛶</button>` : ''}
       </div>
     </div>
   </section>`;
@@ -451,6 +456,13 @@ function hintHtml(): string {
 
 // ------------------------------------------------------------------ модалки
 function pauseModal(): string {
+  if (confirmRestart) {
+    return `<div class="modal"><div class="panel pop">
+      <h2>${t('restartAsk')}</h2>${ornament()}
+      <p>${t('restartConfirm')}</p>
+      <div class="row2"><button class="btn danger" data-act="restartYes">${t('yes')}</button><button class="btn sec" data-act="restartNo">${t('no')}</button></div>
+    </div></div>`;
+  }
   if (confirmQuit) {
     return `<div class="modal"><div class="panel pop">
       <h2>${t('toMenu')}?</h2>${ornament()}
@@ -634,6 +646,50 @@ function renderScreen(): void {
 function renderHud(): void {
   setHtml($('hud'), hudHtml());
   setHtml($('hint'), hintHtml());
+  renderSide();
+}
+
+/** Боковые панели (десктоп/планшет): перерисовываются, только если содержимое изменилось — фокус не теряется. */
+const sideCache = { l: '', r: '' };
+function renderSide(): void {
+  const wide = isWide();
+  const ctx = { hud, gstate };
+  const l = wide ? leftPanel(ctx) : '';
+  const r = wide ? rightPanel(ctx) : '';
+  const elL = $('side-l');
+  const elR = $('side-r');
+  if (l !== sideCache.l) setHtml(elL, l);
+  if (r !== sideCache.r) setHtml(elR, r);
+  sideCache.l = l;
+  sideCache.r = r;
+  elL.hidden = !l;
+  elR.hidden = !r;
+  elL.setAttribute('aria-label', t('sideGame'));
+  elR.setAttribute('aria-label', t('sideControls'));
+}
+
+/** Меню и тосты: на телефоне — внутри поля (как раньше), на широком экране — в отдельном слое по центру окна. */
+function placeLayers(): void {
+  const host = isWide() ? $('overlay') : $('ui');
+  for (const id of ['screen', 'toast', 'ach']) {
+    const el = $(id);
+    if (el.parentElement !== host) {
+      if (id === 'screen') host.prepend(el);
+      else host.appendChild(el);
+    }
+  }
+}
+
+/** Размытая копия текущей карты вокруг поля (виден только на широком экране). */
+function drawBackdrop(ground: CanvasImageSource, far: CanvasImageSource | null): void {
+  const c = document.querySelector<HTMLCanvasElement>('#backdrop canvas');
+  const g = c?.getContext('2d');
+  if (!c || !g) return;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(ground, 0, 0, c.width, c.height);
+  if (far) g.drawImage(far, 0, 0, c.width, Math.round((c.height * 190) / 1128));
+  g.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  g.fillRect(0, 0, c.width, c.height);
 }
 
 function renderModal(): void {
@@ -945,6 +1001,7 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
     case 'restart':
       result = null;
       confirmQuit = false;
+      confirmRestart = false;
       hintType = null;
       bus.emit('restart', undefined);
       break;
@@ -959,6 +1016,17 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
     case 'quitNo':
       confirmQuit = false;
       renderModal();
+      break;
+    case 'restartYes':
+      confirmRestart = false;
+      handleAction('restart', undefined, el);
+      break;
+    case 'restartNo':
+      confirmRestart = false;
+      bus.emit('resume', undefined);
+      break;
+    case 'fullscreen':
+      toggleFullscreen();
       break;
     case 'quitYes':
     case 'quit': {
@@ -1166,6 +1234,7 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
         bus.emit('look', undefined);
       }
       renderScreen();
+      renderSide();
       break;
     }
     case 'equip':
@@ -1196,31 +1265,93 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
   }
 }
 
+/**
+ * Горячие клавиши. Прицел (стрелки, Space при натяжении, Esc/ПКМ — отмена натяжения) — в AimController,
+ * он получает событие раньше и гасит его, если натяжение идёт. Здесь — всё остальное.
+ */
+function onKey(e: KeyboardEvent): void {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const target = e.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+  const inRound = gstate !== 'MENU' && gstate !== 'LEVEL_COMPLETE' && gstate !== 'LEVEL_FAILED';
+  const onButton = target?.tagName === 'BUTTON';
+  if (hud?.ruleset === 'loft' && inRound && (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3')) {
+    const l: LoftLevel = e.code === 'Digit1' ? 'low' : e.code === 'Digit2' ? 'mid' : 'high';
+    handleAction('loftSet', l, document.body);
+    return;
+  }
+  switch (e.code) {
+    case 'Escape':
+      if (gstate === 'PAUSED') {
+        confirmRestart = false;
+        confirmQuit = false;
+        bus.emit('resume', undefined);
+      } else if (gstate === 'AIMING' || gstate === 'FLYING' || gstate === 'SETTLING') bus.emit('pause', undefined);
+      return;
+    case 'KeyM':
+      handleAction('sound', undefined, document.body);
+      return;
+    case 'KeyF':
+      toggleFullscreen();
+      return;
+    case 'KeyR':
+      if (gstate === 'LEVEL_COMPLETE' || gstate === 'LEVEL_FAILED') handleAction('restart', undefined, document.body);
+      else if (inRound && hud?.mode !== 'training') {
+        confirmRestart = true;
+        if (gstate === 'PAUSED') renderModal();
+        else bus.emit('pause', undefined);
+      } else if (inRound) handleAction('restart', undefined, document.body);
+      return;
+    case 'Space':
+    case 'Enter': {
+      // итог раунда: главная кнопка (дальше / ещё раз); на кнопке в фокусе браузер нажмёт её сам
+      if (onButton || (gstate !== 'LEVEL_COMPLETE' && gstate !== 'LEVEL_FAILED')) return;
+      const main = document.querySelector<HTMLButtonElement>('#modal .btn.primary');
+      if (main) {
+        e.preventDefault();
+        main.click();
+      }
+      return;
+    }
+  }
+}
+
 export function initUI(): void {
   const root = $('ui');
   root.innerHTML = `<div id="screen"></div><div id="hud"></div><div id="hint"></div><div id="floats"></div><div id="banner" role="status"></div><div id="modal"></div><div id="toast" role="status"></div><div id="ach" role="status"></div>`;
 
-  root.addEventListener('click', (e) => {
-    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
-    if (!el || el.tagName === 'INPUT') return;
-    handleAction(el.dataset.act!, el.dataset.arg, el);
+  // одни и те же обработчики на поле, слой меню десктопа и боковые панели
+  const bindRoot = (el: HTMLElement) => {
+    el.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement).closest<HTMLElement>('[data-act]');
+      if (!t || t.tagName === 'INPUT') return;
+      handleAction(t.dataset.act!, t.dataset.arg, t);
+    });
+    el.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.dataset.act === 'training') {
+        training = t.checked;
+        renderAll();
+      }
+    });
+    el.addEventListener('input', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (t.dataset.name !== undefined) {
+        const i = Number(t.dataset.name) as 0 | 1;
+        store.update((s) => (s.playerNames[i] = t.value.slice(0, 16)));
+      } else if (t.id === 'ed-name') {
+        ed.setName(t.value);
+      }
+    });
+  };
+  for (const id of ['ui', 'overlay', 'side-l', 'side-r']) bindRoot($(id));
+  placeLayers();
+  onLayout(() => {
+    placeLayers();
+    renderAll();
   });
-  root.addEventListener('change', (e) => {
-    const el = e.target as HTMLInputElement;
-    if (el.dataset.act === 'training') {
-      training = el.checked;
-      renderAll();
-    }
-  });
-  root.addEventListener('input', (e) => {
-    const el = e.target as HTMLInputElement;
-    if (el.dataset.name !== undefined) {
-      const i = Number(el.dataset.name) as 0 | 1;
-      store.update((s) => (s.playerNames[i] = el.value.slice(0, 16)));
-    } else if (el.id === 'ed-name') {
-      ed.setName(el.value);
-    }
-  });
+  bus.on('backdrop', ({ ground, far }) => drawBackdrop(ground, far));
+  document.addEventListener('fullscreenchange', () => renderAll());
 
   bus.on('hud', (h) => {
     hud = h;
@@ -1229,6 +1360,7 @@ export function initUI(): void {
   bus.on('state', (s) => {
     const prev = gstate;
     gstate = s;
+    if (s !== 'PAUSED') confirmRestart = false;
     if (s === 'MENU') {
       result = null;
       tutStep = -1;
@@ -1328,17 +1460,7 @@ export function initUI(): void {
   rot.id = 'rotate';
   rot.setAttribute('role', 'alert');
   document.body.appendChild(rot);
-  window.addEventListener('keydown', (e) => {
-    if (hud?.ruleset === 'loft' && gstate !== 'MENU' && (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3')) {
-      const l: LoftLevel = e.code === 'Digit1' ? 'low' : e.code === 'Digit2' ? 'mid' : 'high';
-      handleAction('loftSet', l, document.body);
-      return;
-    }
-    if (e.code === 'Escape') {
-      if (gstate === 'PAUSED') bus.emit('resume', undefined);
-      else if (gstate === 'AIMING' || gstate === 'FLYING' || gstate === 'SETTLING') bus.emit('pause', undefined);
-    }
-  });
+  window.addEventListener('keydown', onKey);
 
   // Ссылка-вызов: сразу экран «Вызов», минуя меню. Хэш убираем, чтобы перезагрузка не повторяла вызов.
   const consumeHash = () => {

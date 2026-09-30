@@ -151,9 +151,11 @@ export class GameScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ создание
   create(): void {
-    this.S = Math.min(2, window.devicePixelRatio || 1);
+    // масштаб отрисовки = размер холста / логическое поле (задаётся в main.ts)
+    this.S = this.scale.width / FIELD_W;
     const S = this.S;
     bakeAll(this, S, ZONE.r, store.data.equipped);
+    this.emitBackdrop();
 
     // Камера: мировые координаты остаются логическими 720×1080, изображение — чётким на HiDPI.
     const cam = this.cameras.main;
@@ -243,6 +245,7 @@ export class GameScene extends Phaser.Scene {
     bus.on('look', () => {
       bakeLook(this, S, store.data.equipped);
       this.view3d?.refreshTextures();
+      this.emitBackdrop();
     });
     bus.on('settings', () => this.applyViewSetting(true));
     bus.on('skipTutorial', () => {
@@ -260,6 +263,13 @@ export class GameScene extends Phaser.Scene {
   /** Высота броска (навес): последний выбор игрока. */
   private currentLoft(): Loft {
     return store.data.loft;
+  }
+
+  /** Текстуры карты для подложки вокруг поля (оболочка десктопа), после каждого запекания темы. */
+  private emitBackdrop(): void {
+    const src = (key: string) => (this.textures.exists(key) ? (this.textures.get(key).getSourceImage() as CanvasImageSource) : null);
+    const ground = src('ground');
+    if (ground) bus.emit('backdrop', { ground, far: src('far') });
   }
 
   // ------------------------------------------------------------------ 3D-вид (эксперимент)
@@ -1362,10 +1372,15 @@ export class GameScene extends Phaser.Scene {
     const a = this.aimState();
     const p0 = this.idlePos;
     if (!a.active) {
-      // покой: сақа на линии, лёгкое «дыхание»
-      const pulse = 1 + Math.sin(time / 420) * 0.012;
-      this.place(this.idle, p0.x, p0.y, -Math.PI / 2, 0, 1, pulse, this.flags);
-      g.lineStyle(2, 0xf6ecd0, 0.35);
+      // покой: сақа на линии, лёгкое «дыхание»; мышь над зоной броска — сақа подсвечен (можно брать)
+      const hover = this.aim.hover && !botTurn;
+      const pulse = (hover ? 1.05 : 1) + Math.sin(time / 420) * 0.012;
+      this.place(this.idle, p0.x, p0.y, -Math.PI / 2, 0, 1, pulse, this.flags, hover ? 1.6 : 1);
+      if (hover) {
+        g.fillStyle(0x16a5a3, 0.18);
+        g.fillCircle(p0.x, p0.y, 48);
+        g.lineStyle(4, 0x16a5a3, 0.95);
+      } else g.lineStyle(2, 0xf6ecd0, 0.35);
       g.strokeCircle(p0.x, p0.y, 46);
       return;
     }
@@ -1506,7 +1521,8 @@ export class GameScene extends Phaser.Scene {
     const a = this.aimState();
     const p0 = this.idlePos;
     if (!a.active) {
-      g.lineStyle(2, 0xf6ecd0, 0.45);
+      if (this.aim.hover && !botTurn) g.lineStyle(5, 0x16a5a3, 0.95);
+      else g.lineStyle(2, 0xf6ecd0, 0.45);
       this.circleW(g, p0.x, p0.y, 46);
       return;
     }

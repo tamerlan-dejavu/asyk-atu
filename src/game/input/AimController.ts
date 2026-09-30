@@ -26,6 +26,31 @@ export function computeAim(ax: number, ay: number, cx: number, cy: number): AimR
   return { pull: len, power, dirX: Math.sin(a), dirY: -Math.cos(a), valid: len >= MIN_PULL };
 }
 
+/** Шаг точной подстройки с клавиатуры: угол 1°, сила 2 %. */
+export const KEY_ANGLE_STEP = Math.PI / 180;
+export const KEY_POWER_STEP = 0.02;
+/** Сила по умолчанию для прицела с клавиатуры (без мыши). */
+export const KEY_POWER_DEFAULT = 0.5;
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** Прицел с поправкой стрелками: угол ± dAngle (в пределах MAX_AIM_ANGLE), сила ± dPower (0…1). Чистая функция. */
+export function adjustAim(a: AimResult, dAngle: number, dPower: number): AimResult {
+  if (dAngle === 0 && dPower === 0) return a;
+  const ang = clamp(Math.atan2(a.dirX, -a.dirY) + dAngle, -MAX_AIM_ANGLE, MAX_AIM_ANGLE);
+  const power = clamp(a.power + dPower, 0, 1);
+  const valid = a.valid || power > 0;
+  const pull = valid ? MIN_PULL + power * (MAX_PULL - MIN_PULL) : a.pull;
+  return { pull, power, dirX: Math.sin(ang), dirY: -Math.cos(ang), valid };
+}
+
+/** Прицел только с клавиатуры: угол и сила заданы явно. */
+export function keyAim(angle: number, power: number): AimResult {
+  const a = clamp(angle, -MAX_AIM_ANGLE, MAX_AIM_ANGLE);
+  const p = clamp(power, 0, 1);
+  return { pull: MIN_PULL + p * (MAX_PULL - MIN_PULL), power: p, dirX: Math.sin(a), dirY: -Math.cos(a), valid: true };
+}
+
 export interface AimState extends AimResult {
   active: boolean;
   mode: 'pointer' | 'keys';
@@ -78,17 +103,22 @@ const IDLE: AimState = {
 
 /**
  * Прицеливание на Pointer Events (мышь и палец одним кодом).
- * Игнорируем всё, кроме первого указателя; отмена по pointercancel, потере фокуса и коротком оттягивании.
- * P2: клавиатура — стрелки поворачивают, пробел удерживать для силы, отпустить для броска.
+ * Игнорируем всё, кроме первого указателя; отмена по pointercancel, потере фокуса, коротком оттягивании,
+ * правой кнопке мыши и Esc. Указатель захватывается (setPointerCapture): бросок не теряется за краем поля.
+ * Клавиатура: при натяжении мышью стрелки подстраивают угол (1°) и силу (2 %), Space — бросок;
+ * без мыши стрелки или Space включают прицел, Space ещё раз — бросок.
  */
 export class AimController {
   state: AimState = { ...IDLE };
+  /** мышь над зоной броска (подсветка сақа, курсор «рука») */
+  hover = false;
   private pointerId: number | null = null;
+  /** прицел по указателю без поправок и сами поправки со стрелок */
+  private base: AimResult = { ...IDLE };
+  private adj = { angle: 0, power: 0 };
   private keyAngle = 0;
+  private keyPower = KEY_POWER_DEFAULT;
   private keyPreview = false;
-  private charging = false;
-  private chargeT = 0;
-  private keys = { left: false, right: false };
   private readonly cleanup: (() => void)[] = [];
 
   constructor(private readonly o: AimOptions) {
@@ -115,7 +145,7 @@ export class AimController {
 
     on(c, 'pointerdown', (e: PointerEvent) => {
       if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
-      if (this.pointerId !== null || this.charging || !this.o.canAim()) return;
+      if (this.pointerId !== null || !this.o.canAim()) return;
       const p = this.toLogical(e);
       if (p.y < AIM_ZONE_Y) return;
       const map = this.o.mapping?.() ?? null;
@@ -129,29 +159,48 @@ export class AimController {
         /* не критично */
       }
       this.keyPreview = false;
+      this.adj = { angle: 0, power: 0 };
+      this.base = { ...IDLE };
       this.state = { ...IDLE, active: true, mode: 'pointer', ax: w.x, ay: w.y, cx: w.x, cy: w.y, sax: p.x, say: p.y, scx: p.x, scy: p.y };
+      c.style.cursor = 'grabbing';
       this.o.onStart?.();
     });
     on(c, 'pointermove', (e: PointerEvent) => {
+      if (this.pointerId === null) {
+        // наведение мышью: «рука» над зоной броска
+        if (e.pointerType !== 'mouse') return;
+        this.hover = this.o.canAim() && this.toLogical(e).y >= AIM_ZONE_Y;
+        c.style.cursor = this.hover ? 'grab' : '';
+        return;
+      }
       if (e.pointerId !== this.pointerId) return;
+      // правая кнопка во время натяжения — отмена
+      if (e.pointerType === 'mouse' && e.button === 2) {
+        this.cancel();
+        return;
+      }
       const p = this.toLogical(e);
       const map = this.o.mapping?.() ?? null;
       // 3D: точка на земле; если луч ушёл выше горизонта — остаётся последняя валидная (оттягивание зажато)
       const w = map ? (map.toWorld(p.x, p.y) ?? { x: this.state.cx, y: this.state.cy }) : p;
       const g = map ? map.gain : 1;
       const s0 = this.state;
-      const a = computeAim(s0.ax, s0.ay, s0.ax + (w.x - s0.ax) * g, s0.ay + (w.y - s0.ay) * g);
-      this.state = { ...s0, ...a, cx: w.x, cy: w.y, scx: p.x, scy: p.y };
+      this.base = computeAim(s0.ax, s0.ay, s0.ax + (w.x - s0.ax) * g, s0.ay + (w.y - s0.ay) * g);
+      this.state = { ...s0, ...adjustAim(this.base, this.adj.angle, this.adj.power), cx: w.x, cy: w.y, scx: p.x, scy: p.y };
       this.o.onMove?.(this.state);
     });
-    const finish = (e: PointerEvent) => {
-      if (e.pointerId !== this.pointerId) return;
-      const s = this.state;
-      this.reset();
-      if (s.valid && this.o.canAim()) this.o.onRelease(s.power, s.dirX, s.dirY);
-      else this.o.onCancel?.();
-    };
-    on(c, 'pointerup', finish);
+    on(c, 'pointerleave', (e: PointerEvent) => {
+      if (this.pointerId !== null || e.pointerType !== 'mouse') return;
+      this.hover = false;
+      c.style.cursor = '';
+    });
+    on(c, 'contextmenu', (e: MouseEvent) => {
+      e.preventDefault();
+      if (this.pointerId !== null) this.cancel();
+    });
+    on(c, 'pointerup', (e: PointerEvent) => {
+      if (e.pointerId === this.pointerId) this.releasePointer();
+    });
     on(c, 'pointercancel', (e: PointerEvent) => {
       if (e.pointerId === this.pointerId) this.cancel();
     });
@@ -163,82 +212,116 @@ export class AimController {
       if (document.hidden) this.cancel();
     });
 
-    // клавиатура (P2)
-    on(window, 'keydown', (e: KeyboardEvent) => {
-      if (!this.o.canAim()) return;
-      if (e.code === 'ArrowLeft') this.keys.left = true;
-      else if (e.code === 'ArrowRight') this.keys.right = true;
-      else if (e.code === 'Space' && !e.repeat && this.pointerId === null) {
-        this.charging = true;
-        this.chargeT = 0;
-        this.o.onStart?.();
-      } else return;
-      this.keyPreview = true;
-      e.preventDefault();
-    });
-    on(window, 'keyup', (e: KeyboardEvent) => {
-      if (e.code === 'ArrowLeft') this.keys.left = false;
-      else if (e.code === 'ArrowRight') this.keys.right = false;
-      else if (e.code === 'Space' && this.charging) {
-        const s = this.state;
-        this.charging = false;
-        this.keyPreview = false;
-        this.state = { ...IDLE };
-        if (this.o.canAim() && s.power > 0.02) {
-          this.o.onRelease(s.power, s.dirX, s.dirY);
-        } else this.o.onCancel?.();
-      }
-    });
+    // Esc во время натяжения — отмена (а не пауза): слушаем раньше интерфейса и гасим событие
+    on(
+      window,
+      'keydown',
+      (e: KeyboardEvent) => {
+        if (e.code !== 'Escape' || (this.pointerId === null && !this.keyPreview)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.cancel();
+      },
+      { capture: true },
+    );
+    on(window, 'keydown', (e: KeyboardEvent) => this.onKey(e));
   }
 
-  /** Покадровое обновление клавиатурного режима. */
-  update(dtMs: number): void {
-    if (this.pointerId !== null) return;
-    if (!this.o.canAim()) {
-      if (this.charging || this.keyPreview) this.cancel();
+  private onKey(e: KeyboardEvent): void {
+    if (!this.o.canAim() || e.ctrlKey || e.metaKey || e.altKey) return;
+    const tg = e.target as HTMLElement | null;
+    if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
+    const dA = e.code === 'ArrowLeft' ? -KEY_ANGLE_STEP : e.code === 'ArrowRight' ? KEY_ANGLE_STEP : 0;
+    const dP = e.code === 'ArrowUp' ? KEY_POWER_STEP : e.code === 'ArrowDown' ? -KEY_POWER_STEP : 0;
+    if (dA || dP) {
+      e.preventDefault();
+      if (this.pointerId !== null) {
+        // натяжение мышью: точная подстройка поверх жеста
+        this.adj.angle += dA;
+        this.adj.power += dP;
+        this.state = { ...this.state, ...adjustAim(this.base, this.adj.angle, this.adj.power) };
+        this.o.onMove?.(this.state);
+        return;
+      }
+      if (!this.keyPreview) this.startKeys();
+      this.keyAngle = clamp(this.keyAngle + dA, -MAX_AIM_ANGLE, MAX_AIM_ANGLE);
+      this.keyPower = clamp(this.keyPower + dP, 0, 1);
+      this.syncKeys();
       return;
     }
-    const dt = dtMs / 1000;
-    if (this.keys.left) this.keyAngle -= 1.3 * dt;
-    if (this.keys.right) this.keyAngle += 1.3 * dt;
-    this.keyAngle = Math.max(-MAX_AIM_ANGLE, Math.min(MAX_AIM_ANGLE, this.keyAngle));
-    if (!this.keyPreview) return;
-    let power = 0;
-    if (this.charging) {
-      this.chargeT += dt;
-      const ph = (this.chargeT * 0.8) % 2;
-      power = ph < 1 ? ph : 2 - ph; // туда-обратно
+    if (e.code !== 'Space' || e.repeat) return;
+    e.preventDefault();
+    if (this.pointerId !== null) {
+      // Space при натянутой рогатке — бросок
+      this.releasePointer();
+      return;
     }
-    this.state = {
-      ...IDLE,
-      active: true,
-      mode: 'keys',
-      power,
-      pull: MIN_PULL + power * (MAX_PULL - MIN_PULL),
-      valid: this.charging,
-      dirX: Math.sin(this.keyAngle),
-      dirY: -Math.cos(this.keyAngle),
-    };
+    if (!this.keyPreview) {
+      this.startKeys();
+      return;
+    }
+    const s = this.state;
+    this.keyPreview = false;
+    this.state = { ...IDLE };
+    this.o.onRelease(s.power, s.dirX, s.dirY);
+  }
+
+  private startKeys(): void {
+    this.keyPreview = true;
+    this.syncKeys();
+    this.o.onStart?.();
+  }
+
+  private syncKeys(): void {
+    this.state = { ...IDLE, ...keyAim(this.keyAngle, this.keyPower), active: true, mode: 'keys' };
+    this.o.onMove?.(this.state);
+  }
+
+  /** Отпускание натяжения указателем (кнопка мыши отпущена или Space): бросок, если оттянуто достаточно. */
+  private releasePointer(): void {
+    const s = this.state;
+    const id = this.pointerId;
+    this.reset();
+    if (id !== null) {
+      try {
+        this.o.canvas.releasePointerCapture(id);
+      } catch {
+        /* уже отпущен */
+      }
+    }
+    if (s.valid && this.o.canAim()) this.o.onRelease(s.power, s.dirX, s.dirY);
+    else this.o.onCancel?.();
+  }
+
+  /** Покадровое обновление: прицел с клавиатуры и подсветка гаснут, когда бросать нельзя. */
+  update(_dtMs: number): void {
+    if (this.o.canAim()) return;
+    if (this.keyPreview) this.cancel();
+    if (this.hover) {
+      this.hover = false;
+      this.o.canvas.style.cursor = '';
+    }
   }
 
   private reset(): void {
     this.pointerId = null;
     this.state = { ...IDLE };
+    this.o.canvas.style.cursor = this.hover ? 'grab' : '';
   }
 
   /** Отмена без траты попытки. */
   cancel(): void {
-    const was = this.state.active || this.charging;
-    if (this.pointerId !== null) {
+    const was = this.state.active || this.keyPreview;
+    const id = this.pointerId;
+    this.pointerId = null;
+    if (id !== null) {
       try {
-        this.o.canvas.releasePointerCapture(this.pointerId);
+        this.o.canvas.releasePointerCapture(id);
       } catch {
         /* уже отпущен */
       }
     }
-    this.charging = false;
     this.keyPreview = false;
-    this.keys = { left: false, right: false };
     this.reset();
     if (was) this.o.onCancel?.();
   }

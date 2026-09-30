@@ -1,0 +1,120 @@
+{
+  "desktop-1920x1080": {
+    "layout": "desktop",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 97,
+    "field": {
+      "x": 611,
+      "y": 16,
+      "w": 699,
+      "h": 1048
+    },
+    "errors": []
+  },
+  "desktop-1440x900": {
+    "layout": "desktop",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 96.4,
+    "field": {
+      "x": 431,
+      "y": 16,
+      "w": 579,
+      "h": 868
+    },
+    "errors": []
+  },
+  "desktop-1366x768": {
+    "layout": "desktop",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 95.8,
+    "field": {
+      "x": 438,
+      "y": 16,
+      "w": 491,
+      "h": 736
+    },
+    "errors": []
+  },
+  "desktop-2560x1440": {
+    "layout": "desktop",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 97.8,
+    "field": {
+      "x": 811,
+      "y": 16,
+      "w": 939,
+      "h": 1408
+    },
+    "errors": []
+  },
+  "tablet-1024x768": {
+    "layout": "desktop",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 86.6,
+    "field": {
+      "x": 290,
+      "y": 52,
+      "w": 443,
+      "h": 665
+    },
+    "errors": []
+  },
+  "tablet-768x1024": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 100,
+    "field": {
+      "x": 43,
+      "y": 0,
+      "w": 683,
+      "h": 1024
+    },
+    "errors": []
+  },
+  "phone-390x844": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 69.3,
+    "field": {
+      "x": 0,
+      "y": 130,
+      "w": 390,
+      "h": 585
+    },
+    "errors": [],
+    "diff_menu": 0,
+    "diff_game": 0,
+    "diff_result": 0
+  },
+  "phone-360x740": {
+    "layout": "phone",
+    "scrollX": false,
+    "scrollY": false,
+    "fieldClipped": false,
+    "fieldHeightPct": 73,
+    "field": {
+      "x": 0,
+      "y": 100,
+      "w": 360,
+      "h": 540
+    },
+    "errors": [],
+    "diff_menu": 0,
+    "diff_game": 0,
+    "diff_result": 0
+  }
+}
