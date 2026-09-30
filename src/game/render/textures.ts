@@ -3,7 +3,7 @@ import { ASYK, BLOCK, FIELD_H, FIELD_W, SAKA } from '../config';
 import { bonePolygon } from '../physics/bodies';
 import { mulberry32 } from '../levels/rng';
 import { asykPal, GOLDEN_PAL, HEAVY_PAL, sakaPal, themePal, type AsykPal, type SakaPal, type ThemePal } from './looks';
-import { ASYK_ART, SAKA_ART, themeProps, TYPE_ART, VARIANTS } from './art';
+import { ASYK_ART, SAKA_ART, SAKA_LOOKS_LIKE_ASYK, themeProps, TYPE_ART, VARIANTS } from './art';
 
 /** Поля вокруг слоёв параллакса, чтобы при сдвиге не открывались края. */
 export const LAYER_MARGIN = 24;
@@ -793,7 +793,9 @@ export function bakeLook(scene: Phaser.Scene, S: number, look: Look): void {
   });
   bake(scene, 'far', gw, FAR_H, S, (c) => drawFar(c, gw, FAR_H, th));
   bake(scene, 'near', gw, gh, S, (c) => drawNear(c, gw, gh, th));
-  const sakaImg = art(SAKA_ART[look.saka] ?? SAKA_ART.saka_bronze);
+  const sakaImg = SAKA_LOOKS_LIKE_ASYK
+    ? art(`${ASYK_ART[look.asyk] ?? ASYK_ART.asyk_bone}_1`)
+    : art(SAKA_ART[look.saka] ?? SAKA_ART.saka_bronze);
   const { w: sw, h: sh } = TEX.saka;
   bake(scene, 'saka', sw, sh, S, (c) => (sakaImg ? drawArt(c, sakaImg, sw, sh, SAKA.w, SAKA.h) : drawSaka(c, sw, sh, sakaPal(look.saka))));
   bake(scene, 'sakaHalo', sw, sh, S, (c) => {

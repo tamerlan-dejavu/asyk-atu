@@ -4,7 +4,7 @@ import { FAR_H, LAYER_MARGIN, TEX } from '../render/textures';
 import type { AsykType } from '../../types';
 import { ASPECT, fitCamera, project as projectPure, type CamParams, type Projected } from './camera3d';
 import { meshTransform, type BodySnapshot } from './sync';
-import { assetUrl } from '../render/art';
+import { assetUrl, SAKA_LOOKS_LIKE_ASYK } from '../render/art';
 import {
   CanvasTexture,
   Color,
@@ -141,7 +141,9 @@ export class ThreeView {
       this.disposables.push(mesh.geometry, mat);
       [mat.map, mat.metalnessMap].forEach((t) => t && this.disposables.push(t));
       // уже созданные асыки перестраиваются моделью при следующей синхронизации
-      for (const [id, m] of this.meshes) if (m.kind.startsWith('asyk:') && m.kind !== 'asyk:block') this.removeMesh(id);
+      for (const [id, m] of this.meshes)
+        if ((m.kind.startsWith('asyk:') && m.kind !== 'asyk:block') || (SAKA_LOOKS_LIKE_ASYK && m.kind.startsWith('saka:')))
+          this.removeMesh(id);
     } catch {
       /* без модели — прежняя геометрия */
     }
@@ -428,10 +430,13 @@ export class ThreeView {
     const key = `${kind}:${b.type}`;
     if (found && found.kind === key) return found;
     if (found) this.removeMesh(b.id);
-    const model = kind === 'asyk' && this.asykModel;
+    const asSaka = kind === 'saka' && SAKA_LOOKS_LIKE_ASYK;
+    const model = (kind === 'asyk' || asSaka) && this.asykModel;
     const body = model
-      ? new Mesh(this.asykModel!.geo, this.modelMaterial(b.type))
+      ? new Mesh(this.asykModel!.geo, this.modelMaterial(asSaka ? 'normal' : b.type))
       : new Mesh(this.geometry(kind), this.materials(kind, b.type));
+    // временно: сақа — та же модель асыка в размере сақа (56×34), чуть крупнее мишеней
+    if (model && asSaka) body.scale.set(SAKA.w / ASYK.w, SAKA.h / ASYK.h, SAKA.h / ASYK.h);
     body.castShadow = this.opt.quality === 'high';
     body.receiveShadow = false;
     const group = new Group();

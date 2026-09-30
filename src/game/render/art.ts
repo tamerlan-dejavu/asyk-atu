@@ -47,6 +47,12 @@ export const themeProps = (theme: string): string[] => THEME_PROPS[theme] ?? THE
 
 export const artKey = (name: string): string => `art:${name}`;
 
+/**
+ * ВРЕМЕННО: игрок бросает асык, а не сақа — только внешний вид (физика и хитбокс сақа 56×34 прежние).
+ * 2D: картинка асыка надетого набора; 3D: модель асыка, крупнее мишеней. false — вернуть сақа.
+ */
+export const SAKA_LOOKS_LIKE_ASYK = true;
+
 /** Эффект сақа по скину: цвет следа и вид частиц при полёте/ударе. */
 export type SkinFx = 'none' | 'sparks' | 'glow' | 'neon' | 'embers';
 export const SKIN_FX: Record<string, { trail: number; fx: SkinFx }> = {
