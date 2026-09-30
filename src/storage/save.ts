@@ -64,6 +64,9 @@ export function defaultSave(): SaveV2 {
     counters: defaultCounters(),
     view: '2d',
     view3dBlocked: false,
+    ruleset: 'classic',
+    loft: 'mid',
+    endlessBestLoft: { score: 0, wave: 0 },
   };
 }
 
@@ -140,6 +143,7 @@ export function sanitizeResume(raw: unknown): ResumeState | null {
         dailyKey: typeof ex.dailyKey === 'string' ? ex.dailyKey.slice(0, 10) : undefined,
         challengeScore: typeof ex.challengeScore === 'number' ? num(ex.challengeScore, 0) : undefined,
         challengeName: typeof ex.challengeName === 'string' ? ex.challengeName.slice(0, 16) : undefined,
+        ruleset: ex.ruleset === 'loft' ? 'loft' : undefined,
       },
     };
   } catch {
@@ -255,6 +259,13 @@ export function sanitize(raw: unknown): SaveV2 {
     // миграция: поля нет → 2D
     view: isV2 && r.view === '3d' ? '3d' : '2d',
     view3dBlocked: isV2 && r.view3dBlocked === true,
+    // миграция: полей нет → классика и средняя высота
+    ruleset: isV2 && r.ruleset === 'loft' ? 'loft' : 'classic',
+    loft: isV2 && (r.loft === 'low' || r.loft === 'high') ? r.loft : 'mid',
+    endlessBestLoft: {
+      score: Math.floor(num(isObj(r.endlessBestLoft) ? r.endlessBestLoft.score : 0, 0)),
+      wave: Math.floor(num(isObj(r.endlessBestLoft) ? r.endlessBestLoft.wave : 0, 0)),
+    },
   };
 }
 
@@ -387,8 +398,13 @@ export interface LevelResultInfo {
 }
 
 /** Записывает результат кампании: рекорд, звёзды (максимум), открытие следующего уровня. */
-export function applyLevelResult(save: SaveV2, levelId: number, score: number, stars: 0 | 1 | 2 | 3): LevelResultInfo {
-  const key = String(levelId);
+export function applyLevelResult(
+  save: SaveV2,
+  levelId: number,
+  score: number,
+  stars: 0 | 1 | 2 | 3,
+  key = String(levelId),
+): LevelResultInfo {
   const prev = save.levels[key] ?? { best: 0, stars: 0 as const, plays: 0 };
   const newRecord = score > prev.best;
   const bestStars = Math.max(prev.stars, stars) as 0 | 1 | 2 | 3;

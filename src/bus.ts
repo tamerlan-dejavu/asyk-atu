@@ -1,4 +1,4 @@
-import type { BotLevel, GameMode } from './types';
+import type { BotLevel, GameMode, LoftLevel, Ruleset } from './types';
 import type { GameState } from './game/rules/turnState';
 import type { RoundSummary } from './game/rules/round';
 import type { Key } from './i18n';
@@ -22,6 +22,8 @@ export interface StartRequest {
   botLevel?: BotLevel;
   /** бесконечный: seed забега (вызов по ссылке) */
   runSeed?: number;
+  /** набор правил (вызов по ссылке задаёт его принудительно) */
+  ruleset?: Ruleset;
 }
 
 export interface HudData {
@@ -43,6 +45,9 @@ export interface HudData {
   wave?: number;
   botLevel?: BotLevel;
   botThinking?: boolean;
+  /** набор правил раунда и выбранная высота броска */
+  ruleset: Ruleset;
+  loft: LoftLevel;
   /** подсказка у линии броска (до первого броска) */
   showHint: boolean;
 }
@@ -64,6 +69,7 @@ export interface ResultData {
   challenge?: { code?: string; shortId?: string; friendName?: string; friendScore?: number };
   editorTest?: boolean;
   botLevel?: BotLevel;
+  ruleset: Ruleset;
   /** сколько тиын получено за раунд (включая достижения) */
   coins: number;
 }
@@ -91,7 +97,7 @@ export interface BusEvents {
   float: { x: number; y: number; text: string; kind: 'pts' | 'combo' };
   banner: { key: Key; params?: Record<string, string | number> };
   /** первое появление нового типа тела */
-  hint: { type: 'golden' | 'heavy' | 'block' };
+  hint: { type: 'golden' | 'heavy' | 'block' | 'loft' };
   achievement: { id: string };
   toast: { key: Key; params?: Record<string, string | number> };
 }

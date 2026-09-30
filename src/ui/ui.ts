@@ -11,7 +11,8 @@ import type { GameState } from '../game/rules/turnState';
 import { getLang, onLang, setLang, t, type Key } from '../i18n';
 import { activatePro, buyItem, equipItem, itemById } from '../shop/catalog';
 import { CUSTOM_LIMIT, store } from '../storage/save';
-import type { BotLevel, CustomLevel, Difficulty, Lang, Quality } from '../types';
+import type { BotLevel, CustomLevel, Difficulty, Lang, LoftLevel, Quality, Ruleset } from '../types';
+import { dailyKey as rsDailyKey, levelKey } from '../game/rules/ruleset';
 import { $, botLabel, HORN, levelName, modeLabel, ornament, playerName, sakaIcon, setHtml, stars, toast, u } from './common';
 import * as ed from './editor';
 import { recordsScreen, type RecordsTab } from './records';
@@ -65,7 +66,7 @@ let pendingLink: LinkKind | null = null;
 let pendingShort: { id: string; plays: number; rows: BoardRow[] | null | 'loading' | 'error' } | null = null;
 let linkLoading = false;
 let lastStart: StartRequest | null = null;
-let hintType: 'golden' | 'heavy' | 'block' | null = null;
+let hintType: 'golden' | 'heavy' | 'block' | 'loft' | null = null;
 const achQueue: string[] = [];
 let achShowing = false;
 
@@ -133,6 +134,7 @@ function modesScreen(): string {
       ${card('goto', 'daily', '📅', 'daily', 'modeDailyDesc', db !== undefined ? ` · ${t('best')}: ${db}` : '')}
       ${FEATURES.editor ? card('editorNew', '', '✏', 'editor', 'modeEditorDesc') : ''}
       ${FEATURES.editor ? card('goto', 'mine', '📂', 'myLevels', 'modeMineDesc', ` · ${store.data.customLevels.length}/${CUSTOM_LIMIT}`) : ''}
+      ${card('loftPlay', '', '🎯', 'rulesetLoft', 'modeLoftDesc')}
       ${FEATURES.cloud ? card('goto', 'board', '🏆', 'leaderboard', 'modeBoardDesc') : ''}
       ${FEATURES.shop ? card('goto', 'shop', '🪙', 'shop', 'modeShopDesc', ` · ${store.data.coins}`) : ''}
     </div>
@@ -140,7 +142,7 @@ function modesScreen(): string {
 }
 
 function levelCard(l: { id: number; throws: number; par: number | null }, open: boolean): string {
-  const st = store.data.levels[String(l.id)];
+  const st = store.data.levels[levelKey(l.id, store.data.ruleset)];
   const meta = l.id === 0 ? '' : `<span>${t('throwsN', { n: l.throws })}</span><span>${t('parN', { n: l.par ?? 0 })}</span>`;
   return `
     <button class="card${open ? '' : ' locked'}" data-act="level" data-arg="${l.id}" ${open ? '' : 'disabled'} aria-label="${t('levelN', { n: l.id })}: ${levelName(l.id)}${open ? '' : ' — ' + t('locked')}">
@@ -161,6 +163,12 @@ function levelsScreen(): string {
   <section class="screen">
     <header class="bar"><button class="btn sec sm" data-act="goto" data-arg="menu">← ${t('back')}</button><h2>${t('chooseLevel')}</h2></header>
     ${ornament()}
+    <div class="chips rs-switch" role="group" aria-label="${t('ruleset')}">${(['classic', 'loft'] as Ruleset[])
+      .map(
+        (r) =>
+          `<button class="chip wide${s.ruleset === r ? ' on' : ''}" data-act="rulesetSet" data-arg="${r}" aria-pressed="${s.ruleset === r}">${t(r === 'loft' ? 'rulesetLoft' : 'rulesetClassic')}</button>`,
+      )
+      .join('')}</div>
     <label class="toggle"><input type="checkbox" data-act="training" ${training ? 'checked' : ''}/> <span><b>${t('training')}</b><small>${t('trainingHint')}</small></span></label>
     <div class="scroll levels-scroll">
       ${ch(
@@ -206,7 +214,7 @@ function duelScreen(): string {
 }
 
 function dailyScreen(): string {
-  const best = store.data.daily[dateKey()]?.best;
+  const best = store.data.daily[rsDailyKey(dateKey(), store.data.ruleset)]?.best;
   return `
   <section class="screen">
     <header class="bar"><button class="btn sec sm" data-act="goto" data-arg="modes">← ${t('back')}</button><h2>${t('dailyTitle')}</h2></header>
@@ -223,7 +231,7 @@ function dailyScreen(): string {
 }
 
 function endlessScreen(): string {
-  const eb = store.data.endlessBest;
+  const eb = store.data.ruleset === 'loft' ? store.data.endlessBestLoft : store.data.endlessBest;
   return `
   <section class="screen">
     <header class="bar"><button class="btn sec sm" data-act="goto" data-arg="modes">← ${t('back')}</button><h2>${t('endless')}</h2></header>
@@ -349,6 +357,9 @@ function settingsScreen(): string {
       <h3>${t('sound')}</h3>
       <div class="chips">${opt('soundSet', '1', t('on'), s.sound)}${opt('soundSet', '0', t('off'), !s.sound)}</div>
       ${canVibrate ? `<h3>${t('vibration')}</h3><div class="chips">${opt('vibSet', '1', t('on'), s.vibration)}${opt('vibSet', '0', t('off'), !s.vibration)}</div>` : ''}
+      <h3>${t('ruleset')}</h3>
+      <div class="chips">${opt('rulesetSet', 'classic', t('rulesetClassic'), s.ruleset !== 'loft')}${opt('rulesetSet', 'loft', t('rulesetLoft'), s.ruleset === 'loft')}</div>
+      <p class="small">${t('rulesetHint')}</p>
       <h3>${t('view')}</h3>
       <div class="chips">${opt('viewSet', '2d', t('view2d'), s.view !== '3d')}${opt('viewSet', '3d', t('view3d'), s.view === '3d')}</div>
       <p class="small">${t('view3dHint')}</p>
@@ -363,9 +374,27 @@ function settingsScreen(): string {
 }
 
 // ------------------------------------------------------------------ HUD
+/** Три кнопки высоты броска у большого пальца (набор «навес»). Иконки: линия, дуга, высокая дуга. */
+function loftBar(): string {
+  if (!hud || hud.ruleset !== 'loft' || gstate === 'MENU') return '';
+  if (hud.mode === 'duel' && hud.player === 1) return '';
+  const icon: Record<LoftLevel, string> = {
+    low: '<path d="M4 20 L28 16" />',
+    mid: '<path d="M4 22 Q16 6 28 22" />',
+    high: '<path d="M4 24 Q16 -8 28 24" />',
+  };
+  const btn = (l: LoftLevel, key: Key) =>
+    `<button class="loftbtn${hud!.loft === l ? ' on' : ''}" data-act="loftSet" data-arg="${l}" aria-pressed="${hud!.loft === l}" aria-label="${t('loftHeight')}: ${t(key)}"><svg viewBox="0 0 32 28" aria-hidden="true">${icon[l]}</svg><small>${t(key)}</small></button>`;
+  return `<div class="loftbar" role="group" aria-label="${t('loftHeight')}">${btn('high', 'loftHigh')}${btn('mid', 'loftMid')}${btn('low', 'loftLow')}</div>`;
+}
+
 function hudHtml(): string {
   if (!hud || gstate === 'MENU') return '';
-  const h = hud;
+  return hudCore() + loftBar();
+}
+
+function hudCore(): string {
+  const h = hud!;
   if (h.mode === 'versus' || h.mode === 'duel') {
     const chip = (i: 0 | 1) => {
       const active = h.player === i;
@@ -396,7 +425,8 @@ function hudHtml(): string {
 function hintHtml(): string {
   let out = '';
   if (hintType && gstate !== 'MENU') {
-    const key: Key = hintType === 'golden' ? 'hintGolden' : hintType === 'heavy' ? 'hintHeavy' : 'hintBlock';
+    const key: Key =
+      hintType === 'golden' ? 'hintGolden' : hintType === 'heavy' ? 'hintHeavy' : hintType === 'loft' ? 'hintLoft' : 'hintBlock';
     out += `<button class="typehint t-${hintType}" data-act="closeHint"><b>${t(key)}</b><small>${t('tapToClose')}</small></button>`;
   }
   if (!hud) return out;
@@ -865,6 +895,20 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
       store.update((s) => (s.vibration = arg === '1'));
       renderAll();
       break;
+    case 'loftSet':
+      store.update((s) => (s.loft = arg as LoftLevel));
+      if (hud) hud = { ...hud, loft: arg as LoftLevel };
+      sfx.click();
+      renderHud();
+      break;
+    case 'rulesetSet':
+      store.update((s) => (s.ruleset = arg === 'loft' ? 'loft' : 'classic'));
+      renderAll();
+      break;
+    case 'loftPlay':
+      store.update((s) => (s.ruleset = 'loft'));
+      gotoScreen('levels');
+      break;
     case 'viewSet':
       // ручной выбор снимает автоматический запрет 3D
       store.update((s) => {
@@ -1275,6 +1319,11 @@ export function initUI(): void {
   rot.setAttribute('role', 'alert');
   document.body.appendChild(rot);
   window.addEventListener('keydown', (e) => {
+    if (hud?.ruleset === 'loft' && gstate !== 'MENU' && (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3')) {
+      const l: LoftLevel = e.code === 'Digit1' ? 'low' : e.code === 'Digit2' ? 'mid' : 'high';
+      handleAction('loftSet', l, document.body);
+      return;
+    }
     if (e.code === 'Escape') {
       if (gstate === 'PAUSED') bus.emit('resume', undefined);
       else if (gstate === 'AIMING' || gstate === 'FLYING' || gstate === 'SETTLING') bus.emit('pause', undefined);

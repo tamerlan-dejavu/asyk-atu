@@ -379,6 +379,8 @@ export class ThreeView {
       const tr = meshTransform(b);
       m.group.position.set(tr.px, tr.py, tr.pz);
       m.group.rotation.y = tr.rotY;
+      // навес: «кувырок» вокруг длинной оси в полёте (только визуал; ось X — длинная ось тела)
+      m.body.rotation.x = b.tilt ?? 0;
       m.group.scale.setScalar(tr.scale);
       m.group.visible = b.alpha > 0.02;
       if (m.blob && m.blobMat) {

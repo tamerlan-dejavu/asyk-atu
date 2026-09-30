@@ -6,6 +6,7 @@ import { t, type Key } from '../i18n';
 import { MAX_LEVEL, store } from '../storage/save';
 import { esc, levelName, modeLabel, ornament, stars } from './common';
 import { cloudHistoryBlock } from './cloudui';
+import { dailyKey as rsDailyKey, levelKey } from '../game/rules/ruleset';
 
 export type RecordsTab = 'levels' | 'history' | 'stats' | 'ach';
 
@@ -20,16 +21,18 @@ function levelsTab(confirmReset: boolean): string {
   const list = s.pro ? [...LEVELS, ...PRO_LEVELS] : LEVELS;
   const rows = list
     .map((l) => {
-      const st = s.levels[String(l.id)];
+      const st = s.levels[levelKey(l.id, s.ruleset)];
       return `<tr><td>${l.id === 0 ? '★' : l.id}. ${levelName(l.id)}</td><td>${stars(st?.stars ?? 0)}</td><td class="r">${st ? st.best : '—'}</td></tr>`;
     })
     .join('');
-  const daily = s.daily[dateKey()]?.best;
+  const daily = s.daily[rsDailyKey(dateKey(), s.ruleset)]?.best;
+  const eb = s.ruleset === 'loft' ? s.endlessBestLoft : s.endlessBest;
   return `
+    <p class="small rs-label">${t('rulesetOf', { name: t(s.ruleset === 'loft' ? 'rulesetLoft' : 'rulesetClassic') })} · <button class="linkbtn" data-act="rulesetSet" data-arg="${s.ruleset === 'loft' ? 'classic' : 'loft'}">${t(s.ruleset === 'loft' ? 'rulesetClassic' : 'rulesetLoft')}</button></p>
     <table class="tbl"><thead><tr><th></th><th>★</th><th class="r">${t('bestScore')}</th></tr></thead><tbody>${rows}</tbody></table>
     <ul class="stats">
       <li><span>${t('dailyTitle')}</span><b>${daily ?? '—'}</b></li>
-      <li><span>${t('endless')}</span><b>${s.endlessBest.score > 0 ? t('endlessBest', { score: s.endlessBest.score, wave: s.endlessBest.wave }) : '—'}</b></li>
+      <li><span>${t('endless')}</span><b>${eb.score > 0 ? t('endlessBest', { score: eb.score, wave: eb.wave }) : '—'}</b></li>
     </ul>
     ${
       confirmReset
