@@ -3,6 +3,7 @@ import { ASYK, BLOCK, FIELD_H, FIELD_W, SAKA } from '../config';
 import { bonePolygon } from '../physics/bodies';
 import { mulberry32 } from '../levels/rng';
 import { asykPal, GOLDEN_PAL, HEAVY_PAL, sakaPal, themePal, type AsykPal, type SakaPal, type ThemePal } from './looks';
+import { ASYK_ART, SAKA_ART, TYPE_ART, VARIANTS } from './art';
 
 /** Поля вокруг слоёв параллакса, чтобы при сдвиге не открывались края. */
 export const LAYER_MARGIN = 24;
@@ -21,6 +22,98 @@ export const PAL = {
   turquoise: '#16a5a3',
   turquoiseDark: '#0e7f7d',
 };
+
+// ---------------------------------------------------------------- рисованные ассеты
+/** Источник загруженных картинок (задаёт сцена после preload). Нет картинки — процедурная отрисовка. */
+let art: (name: string) => CanvasImageSource | null = () => null;
+export function setArtSource(fn: (name: string) => CanvasImageSource | null): void {
+  art = fn;
+}
+
+/** Спрайт по центру текстуры в размере тела (хитбокс не меняется: картинка вписывается в него). */
+function drawArt(ctx: Ctx, img: CanvasImageSource, w: number, h: number, bw: number, bh: number): void {
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, (w - bw) / 2, (h - bh) / 2, bw, bh);
+}
+
+/** Размер картинки блока в логических px: вписана в хитбокс (исходник 72×64 → по ширине хитбокса +10 %). */
+const BLOCK_ART = { w: BLOCK.size * 1.12, h: (BLOCK.size * 1.12 * 64) / 72 };
+
+/**
+ * Контурный ореол по силуэту спрайта (белый — цвет задаётся tint по яркости карты): асык читается
+ * и на светлой, и на тёмной земле. Силуэт «раздувается» сдвигами на radius во все стороны.
+ */
+function drawHalo(ctx: Ctx, img: CanvasImageSource, w: number, h: number, bw: number, bh: number, radius: number): void {
+  const x = (w - bw) / 2;
+  const y = (h - bh) / 2;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    ctx.drawImage(img, x + Math.cos(a) * radius, y + Math.sin(a) * radius, bw, bh);
+  }
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/** Кадр «блеска» золотого асыка: светлая диагональная полоса поверх спрайта (только по его пикселям). */
+function drawShine(ctx: Ctx, img: CanvasImageSource, w: number, h: number, bw: number, bh: number, t: number): void {
+  drawArt(ctx, img, w, h, bw, bh);
+  ctx.globalCompositeOperation = 'source-atop';
+  const x = -w * 0.4 + t * w * 1.8;
+  const g = ctx.createLinearGradient(x - 10, 0, x + 10, h);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.5, 'rgba(255,252,225,0.85)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/** Декор площадки по теме: какие пропсы и сколько (не физика, не заходят в кон и в зону броска). */
+const THEME_PROPS: Record<string, string[]> = {
+  theme_yard: ['props_pebble_1', 'props_pebble_2', 'props_pebble_3', 'props_twig_1', 'props_twig_2', 'props_grass_1', 'props_grass_3'],
+  theme_steppe: [
+    'props_grass_1',
+    'props_grass_2',
+    'props_grass_3',
+    'props_grass_4',
+    'props_flower_yellow',
+    'props_flower_white',
+    'props_pebble_4',
+  ],
+  theme_toy: ['props_flower_red', 'props_flower_yellow', 'props_flower_white', 'props_pebble_2', 'props_grass_2', 'props_twig_3'],
+  theme_night: ['props_snow_1', 'props_snow_2', 'props_pebble_1', 'props_pebble_5', 'props_twig_2', 'props_grass_4'],
+};
+
+function drawProps(ctx: Ctx, w: number, h: number, theme: string): void {
+  const names = THEME_PROPS[theme] ?? THEME_PROPS.theme_yard;
+  const rnd = mulberry32(theme.length * 97 + 13);
+  const zx = FIELD_W / 2 + LAYER_MARGIN;
+  const zy = 350 + LAYER_MARGIN;
+  let placed = 0;
+  for (let tries = 0; tries < 400 && placed < 16; tries++) {
+    const x = LAYER_MARGIN + 18 + rnd() * (w - 2 * LAYER_MARGIN - 36);
+    const y = LAYER_MARGIN + 205 + rnd() * (h - LAYER_MARGIN * 2 - 230);
+    // не в кону (с запасом), не у линии броска и не в середине поля — только по краям
+    if (Math.hypot(x - zx, y - zy) < 180 + 60) continue;
+    if (Math.abs(x - zx) < 150 && y > 560) continue;
+    const img = art(names[Math.floor(rnd() * names.length)]);
+    if (!img) continue;
+    const iw = (img as HTMLImageElement).width || 64;
+    const ih = (img as HTMLImageElement).height || 64;
+    const size = 20 + rnd() * 16;
+    const k = size / Math.max(iw, ih);
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.translate(x, y);
+    ctx.rotate((rnd() - 0.5) * 0.8);
+    ctx.drawImage(img, (-iw * k) / 2, (-ih * k) / 2, iw * k, ih * k);
+    ctx.restore();
+    placed++;
+  }
+}
 
 /** Рисует в текстуру-холст; при повторном вызове перерисовывает существующую (без пересоздания). */
 function bake(scene: Phaser.Scene, key: string, w: number, h: number, S: number, draw: (ctx: Ctx) => void): void {
@@ -382,7 +475,31 @@ function drawZone(ctx: Ctx, size: number, r: number): void {
   ctx.arc(c, c, r, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
-  // декор снаружи
+  // орнаментальная кайма «оюлы» по кромке кона (рисованный ассет): внешний край каймы = граница «выбит»;
+  // иначе — точки. Кайма приглушена, чтобы асыки на ней читались.
+  const ring = art('ring_oyu');
+  if (ring) {
+    const d = (r + 6) * 2;
+    ctx.save();
+    ctx.globalAlpha = 0.42;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(ring, c - d / 2, c - d / 2, d, d);
+    ctx.restore();
+    // граница «выбит» поверх орнамента — остаётся читаемой
+    ctx.strokeStyle = PAL.turquoiseDark;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(c, c, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = PAL.cream;
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([2, 7]);
+    ctx.beginPath();
+    ctx.arc(c, c, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
   ctx.fillStyle = 'rgba(58,36,18,0.55)';
   for (let i = 0; i < 36; i++) {
     const a = (i / 36) * Math.PI * 2;
@@ -654,16 +771,56 @@ export interface Look {
   asyk: string;
 }
 
+/** Ключ текстуры варианта: 'asyk', 'asyk#2', 'asyk#3' (вариант 1 — базовый ключ, его же берёт 3D-вид). */
+export const variantKey = (key: string, v: number): string => (v <= 1 ? key : `${key}#${v}`);
+/** Кадры блеска золотого асыка. */
+export const SHINE_FRAMES = 6;
+
+/** Асык одного типа: 3 варианта спрайта (или процедурный, если картинок нет) + ореол по силуэту. */
+function bakeAsykSet(scene: Phaser.Scene, S: number, key: string, prefix: string, pal: AsykPal, kind: BoneKind): void {
+  const { w, h } = TEX.asyk;
+  for (let v = 1; v <= VARIANTS; v++) {
+    const img = art(`${prefix}_${v}`);
+    bake(scene, variantKey(key, v), w, h, S, (c) => (img ? drawArt(c, img, w, h, ASYK.w, ASYK.h) : drawAsyk(c, w, h, pal, kind)));
+  }
+  const img1 = art(`${prefix}_1`);
+  bake(scene, `${key}Halo`, w, h, S, (c) => (img1 ? drawHalo(c, img1, w, h, ASYK.w, ASYK.h, 2.2) : drawHaloPoly(c, w, h)));
+  if (kind === 'golden' && img1) {
+    for (let f = 0; f < SHINE_FRAMES; f++)
+      bake(scene, `${key}Shine${f}`, w, h, S, (c) => drawShine(c, img1, w, h, ASYK.w, ASYK.h, f / (SHINE_FRAMES - 1)));
+  }
+}
+
+/** Ореол для процедурного асыка (без картинки): тот же силуэт кости, раздутый на 2 px. */
+function drawHaloPoly(ctx: Ctx, w: number, h: number): void {
+  polyPath(ctx, bonePolygon(ASYK.w, ASYK.h), w / 2, h / 2, 2.2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+}
+
 /** Текстуры, зависящие от оформления (косметика). Можно перепекать без пересоздания спрайтов. */
 export function bakeLook(scene: Phaser.Scene, S: number, look: Look): void {
   const th = themePal(look.theme);
   const gw = FIELD_W + LAYER_MARGIN * 2;
   const gh = FIELD_H + LAYER_MARGIN * 2;
-  bake(scene, 'ground', gw, gh, S, (c) => drawGround(c, gw, gh, th));
+  bake(scene, 'ground', gw, gh, S, (c) => {
+    drawGround(c, gw, gh, th);
+    drawProps(c, gw, gh, look.theme);
+  });
   bake(scene, 'far', gw, FAR_H, S, (c) => drawFar(c, gw, FAR_H, th));
   bake(scene, 'near', gw, gh, S, (c) => drawNear(c, gw, gh, th));
-  bake(scene, 'saka', TEX.saka.w, TEX.saka.h, S, (c) => drawSaka(c, TEX.saka.w, TEX.saka.h, sakaPal(look.saka)));
-  bake(scene, 'asyk', TEX.asyk.w, TEX.asyk.h, S, (c) => drawAsyk(c, TEX.asyk.w, TEX.asyk.h, asykPal(look.asyk), 'normal'));
+  const sakaImg = art(SAKA_ART[look.saka] ?? SAKA_ART.saka_bronze);
+  const { w: sw, h: sh } = TEX.saka;
+  bake(scene, 'saka', sw, sh, S, (c) => (sakaImg ? drawArt(c, sakaImg, sw, sh, SAKA.w, SAKA.h) : drawSaka(c, sw, sh, sakaPal(look.saka))));
+  bake(scene, 'sakaHalo', sw, sh, S, (c) => {
+    if (sakaImg) drawHalo(c, sakaImg, sw, sh, SAKA.w, SAKA.h, 2.4);
+    else {
+      polyPath(c, bonePolygon(SAKA.w, SAKA.h), sw / 2, sh / 2, 2.4);
+      c.fillStyle = '#fff';
+      c.fill();
+    }
+  });
+  bakeAsykSet(scene, S, 'asyk', ASYK_ART[look.asyk] ?? ASYK_ART.asyk_bone, asykPal(look.asyk), 'normal');
 }
 
 /** Запекает ВСЕ текстуры один раз при загрузке: никаких пост-эффектов и размытия в рантайме. */
@@ -671,9 +828,13 @@ export function bakeAll(scene: Phaser.Scene, S: number, zoneR: number, look: Loo
   bakeLook(scene, S, look);
   const zs = (zoneR + 24) * 2;
   bake(scene, 'zone', zs, zs, S, (c) => drawZone(c, zs, zoneR));
-  bake(scene, 'asykGolden', TEX.asyk.w, TEX.asyk.h, S, (c) => drawAsyk(c, TEX.asyk.w, TEX.asyk.h, GOLDEN_PAL, 'golden'));
-  bake(scene, 'asykHeavy', TEX.asyk.w, TEX.asyk.h, S, (c) => drawAsyk(c, TEX.asyk.w, TEX.asyk.h, HEAVY_PAL, 'heavy'));
-  bake(scene, 'block', TEX.block.w, TEX.block.h, S, (c) => drawBlock(c, TEX.block.w, TEX.block.h));
+  bakeAsykSet(scene, S, 'asykGolden', TYPE_ART.golden, GOLDEN_PAL, 'golden');
+  bakeAsykSet(scene, S, 'asykHeavy', TYPE_ART.heavy, HEAVY_PAL, 'heavy');
+  const { w: bw, h: bh } = TEX.block;
+  for (let v = 1; v <= 2; v++) {
+    const img = art(`block_stone_${v}`);
+    bake(scene, variantKey('block', v), bw, bh, S, (c) => (img ? drawArt(c, img, bw, bh, BLOCK_ART.w, BLOCK_ART.h) : drawBlock(c, bw, bh)));
+  }
   bake(scene, 'shadowAsyk', TEX.shadowAsyk.w, TEX.shadowAsyk.h, S, (c) =>
     drawShadow(c, TEX.shadowAsyk.w, TEX.shadowAsyk.h, ASYK.w, ASYK.h),
   );

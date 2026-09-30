@@ -19,6 +19,10 @@ export const ITEMS: ShopItem[] = [
   { id: 'saka_silver', cat: 'saka', price: 100 },
   { id: 'saka_gold', cat: 'saka', price: 200 },
   { id: 'saka_oyu', cat: 'saka', price: 250 },
+  { id: 'saka_eagle', cat: 'saka', price: 300 },
+  { id: 'saka_snowleopard', cat: 'saka', price: 350 },
+  { id: 'saka_tulpar', cat: 'saka', price: 400 },
+  { id: 'saka_lava', cat: 'saka', price: 450 },
   { id: 'saka_jade', cat: 'saka', price: 0, pro: true },
   { id: 'saka_onyx', cat: 'saka', price: 0, pro: true },
   { id: 'theme_yard', cat: 'theme', price: 0 },
@@ -27,6 +31,7 @@ export const ITEMS: ShopItem[] = [
   { id: 'theme_night', cat: 'theme', price: 0, pro: true },
   { id: 'asyk_bone', cat: 'asyk', price: 0 },
   { id: 'asyk_red', cat: 'asyk', price: 120 },
+  { id: 'asyk_wood', cat: 'asyk', price: 150 },
 ];
 
 /** Что входит в тестовый набор «Той-Pro» (кроме 5 дополнительных уровней). */

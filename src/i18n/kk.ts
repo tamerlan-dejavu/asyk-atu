@@ -328,21 +328,26 @@ export const kk: Dict = {
   item_saka_silver: 'Күміс', // verify: native speaker
   item_saka_gold: 'Алтын', // verify: native speaker
   item_saka_oyu: 'Оюлы', // verify: native speaker
-  item_saka_jade: 'Нефрит', // verify: native speaker
-  item_saka_onyx: 'Оникс', // verify: native speaker
+  item_saka_jade: 'Айдаһар', // verify: native speaker
+  item_saka_onyx: 'Неон', // verify: native speaker
+  item_saka_eagle: 'Бүркіт', // verify: native speaker
+  item_saka_snowleopard: 'Барыс', // verify: native speaker
+  item_saka_tulpar: 'Тұлпар', // verify: native speaker
+  item_saka_lava: 'Лава', // verify: native speaker
   item_theme_yard: 'Аула', // verify: native speaker
   item_theme_steppe: 'Дала', // verify: native speaker
   item_theme_toy: 'Той', // verify: native speaker
   item_theme_night: 'Түн', // verify: native speaker
   item_asyk_bone: 'Ақ сүйек', // verify: native speaker
   item_asyk_red: 'Қызыл', // verify: native speaker
+  item_asyk_wood: 'Ағаш', // verify: native speaker
   proTitle: 'Той-Pro', // verify: native speaker
   proDesc: '«Той» тарауы: 5 жаңа деңгей, 2 ерекше сақа және «Түн» алаңы. Безендіру ойын нәтижесіне әсер етпейді.', // verify: native speaker
   buyTest: 'Сатып алу (СЫНАҚ)', // verify: native speaker
   testMode: 'СЫНАҚ РЕЖИМІ — ақша алынбайды', // verify: native speaker
   proConfirm: '«Той-Pro» сынақ сатып алуын растайсың ба?', // verify: native speaker
   proGot: 'Не алдың', // verify: native speaker
-  proGotList: '«Той» тарауының 5 жаңа деңгейі · «Нефрит» және «Оникс» сақасы · «Түн» алаңы', // verify: native speaker
+  proGotList: '«Той» тарауының 5 жаңа деңгейі · «Айдаһар» және «Неон» сақасы · «Түн» алаңы', // verify: native speaker
   proOwned: 'Жинақ алынды', // verify: native speaker
   proNote: 'Нақты төлем өшірілген: бұл ойында артықшылық бермейтін ақылы қосымшалар үлгісінің көрсетілімі.', // verify: native speaker
   proOnly: 'Тек Той-Pro', // verify: native speaker

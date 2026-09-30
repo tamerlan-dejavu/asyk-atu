@@ -37,7 +37,8 @@ import { COIN, levelCoins, processEvent, type AchEvent } from './rules/achieveme
 import { DepthTracker } from './render/depth';
 import { Effects, type FxFlags } from './render/effects';
 import { Parallax } from './render/parallax';
-import { bakeAll, bakeLook, TEX } from './render/textures';
+import { bakeAll, bakeLook, setArtSource, SHINE_FRAMES, TEX, variantKey } from './render/textures';
+import { artFiles, artKey, VARIANTS } from './render/art';
 import { themePal } from './render/looks';
 import { fitCamera, screenToGround } from './view3d/camera3d';
 import type { BodySnapshot } from './view3d/sync';
@@ -51,8 +52,14 @@ interface BodySprites {
   contact: Phaser.GameObjects.Image;
   body: Phaser.GameObjects.Image;
   hl: Phaser.GameObjects.Image;
+  /** контурный ореол по силуэту: асык читается на любой карте (только «Высокое» качество) */
+  halo: Phaser.GameObjects.Image | null;
   kind: 'asyk' | 'saka';
   type: AsykType;
+  /** базовый ключ текстуры (вариант рисунка выбран по id тела) */
+  tex: string;
+  /** сдвиг фазы блеска золотого асыка, мс */
+  phase: number;
 }
 
 interface RunCtx {
@@ -150,10 +157,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ создание
+  /** Рисованные ассеты текущего оформления; ошибка загрузки не критична — останется процедурная отрисовка. */
+  preload(): void {
+    for (const f of artFiles(store.data.equipped)) this.load.image(f.key, f.url);
+  }
+
   create(): void {
     // масштаб отрисовки = размер холста / логическое поле (задаётся в main.ts)
     this.S = this.scale.width / FIELD_W;
     const S = this.S;
+    setArtSource((name) =>
+      this.textures.exists(artKey(name)) ? (this.textures.get(artKey(name)).getSourceImage() as HTMLImageElement) : null,
+    );
+    this.updateHaloStyle();
     bakeAll(this, S, ZONE.r, store.data.equipped);
     this.emitBackdrop();
 
@@ -242,11 +258,14 @@ export class GameScene extends Phaser.Scene {
     bus.on('pause', () => this.pauseGame());
     bus.on('resume', () => this.resumeGame());
     bus.on('toMenu', () => this.toMenu());
-    bus.on('look', () => {
-      bakeLook(this, S, store.data.equipped);
-      this.view3d?.refreshTextures();
-      this.emitBackdrop();
-    });
+    bus.on('look', () =>
+      this.loadArt(() => {
+        this.updateHaloStyle();
+        bakeLook(this, S, store.data.equipped);
+        this.view3d?.refreshTextures();
+        this.emitBackdrop();
+      }),
+    );
     bus.on('settings', () => this.applyViewSetting(true));
     bus.on('skipTutorial', () => {
       store.update((s) => {
@@ -452,20 +471,32 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ спрайты
-  private makeSprites(kind: 'asyk' | 'saka', type: AsykType): BodySprites {
+  private makeSprites(kind: 'asyk' | 'saka', type: AsykType, id = ''): BodySprites {
     const isSaka = kind === 'saka';
     const isBlock = type === 'block';
     const tex = isSaka ? TEX.saka : isBlock ? TEX.block : TEX.asyk;
     const shKey = isSaka ? 'shadowSaka' : isBlock ? 'shadowBlock' : 'shadowAsyk';
     const shadow = this.add.image(0, 0, shKey).setDepth(D_SHADOW);
     const contact = this.add.image(0, 0, shKey).setDepth(D_SHADOW);
+    // вариант рисунка — по id тела (стабилен между перезапусками и в повторе вызова)
+    const h = hashString(id || kind);
+    const base = isSaka ? 'saka' : BODY_TEX[type];
+    const key = isSaka ? base : variantKey(base, 1 + (h % (isBlock ? 2 : VARIANTS)));
     const body = this.add
-      .image(0, 0, isSaka ? 'saka' : BODY_TEX[type])
+      .image(0, 0, this.textures.exists(key) ? key : base)
       .setDepth(D_BODY)
       .setDisplaySize(tex.w, tex.h);
     const hl = this.add.image(0, 0, isSaka ? 'hlSaka' : 'hlAsyk').setDepth(D_HL);
     hl.setDisplaySize(isSaka ? 30 : 20, isSaka ? 20 : 13);
-    return { shadow, contact, body, hl, kind, type };
+    const haloKey = isSaka ? 'sakaHalo' : `${base}Halo`;
+    const halo =
+      isBlock || !this.textures.exists(haloKey)
+        ? null
+        : this.add
+            .image(0, 0, haloKey)
+            .setDepth(D_BODY - 0.5)
+            .setVisible(false);
+    return { shadow, contact, body, hl, halo, kind, type, tex: body.texture.key, phase: h % 3500 };
   }
 
   private hideSprites(s: BodySprites): void {
@@ -473,6 +504,7 @@ export class GameScene extends Phaser.Scene {
     s.contact.setVisible(false);
     s.body.setVisible(false);
     s.hl.setVisible(false);
+    s.halo?.setVisible(false);
   }
 
   private destroySprites(s: BodySprites): void {
@@ -480,6 +512,28 @@ export class GameScene extends Phaser.Scene {
     s.contact.destroy();
     s.body.destroy();
     s.hl.destroy();
+    s.halo?.destroy();
+  }
+
+  /** Цвет и сила ореола по яркости земли: тёмный контур на светлой карте, светлый — на тёмной. */
+  private haloStyle = { color: 0x2b1a0e, alpha: 0.35 };
+  private updateHaloStyle(): void {
+    const hex = themePal(store.data.equipped.theme).ground[0];
+    const n = parseInt(hex.slice(1), 16);
+    const lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+    this.haloStyle = lum > 0.55 ? { color: 0x2b1a0e, alpha: 0.38 } : { color: 0xfff4d6, alpha: 0.55 };
+  }
+
+  /** Загрузить недостающие картинки оформления (скин купили/надели) и выполнить done после загрузки. */
+  private loadArt(done: () => void): void {
+    const need = artFiles(store.data.equipped).filter((f) => !this.textures.exists(f.key));
+    if (need.length === 0) {
+      done();
+      return;
+    }
+    need.forEach((f) => this.load.image(f.key, f.url));
+    this.load.once(Phaser.Loader.Events.COMPLETE, done);
+    this.load.start();
   }
 
   /** Расставляет спрайты тела. Только визуал: положение берётся из физики, обратно ничего не пишется. */
@@ -510,12 +564,30 @@ export class GameScene extends Phaser.Scene {
     const squash = tilt ? 0.7 + 0.3 * Math.abs(Math.cos(tilt)) : 1; // «кувырок» в полёте (косметика)
     const shGrow = 1 + hz / 200;
     const shFade = Math.max(0.3, 1 - hz / 140);
+    // золотой асык: пробегающий блеск раз в ~3,5 с (кадры запечены; без движения — только базовый спрайт)
+    if (s.type === 'golden' && s.kind === 'asyk') {
+      const t = (this.nowMs + s.phase) % 3500;
+      const f = Math.floor((t / 420) * SHINE_FRAMES);
+      const key = this.reducedMq.matches || f >= SHINE_FRAMES ? s.tex : `asykGoldenShine${f}`;
+      if (s.body.texture.key !== key && this.textures.exists(key)) s.body.setTexture(key);
+    }
     s.body
       .setVisible(true)
       .setPosition(x, y - lift)
       .setRotation(angle)
       .setDisplaySize(tex.w * scale, tex.h * scale * squash)
       .setAlpha(alpha);
+    if (s.halo) {
+      const on = flags.soft && alpha > 0.05;
+      s.halo.setVisible(on);
+      if (on)
+        s.halo
+          .setPosition(x, y - lift)
+          .setRotation(angle)
+          .setDisplaySize(tex.w * scale, tex.h * scale * squash)
+          .setTint(this.haloStyle.color)
+          .setAlpha(this.haloStyle.alpha * alpha * (isSaka || s.type !== 'normal' ? 1.25 : 1));
+    }
     if (isBlock) s.hl.setVisible(false);
     else
       s.hl
@@ -674,7 +746,7 @@ export class GameScene extends Phaser.Scene {
     level.asyks.forEach((a, i) => {
       const id = specId(a, i);
       sim.addAsyk(id, a);
-      this.sprites.set(id, this.makeSprites('asyk', a.type ?? 'normal'));
+      this.sprites.set(id, this.makeSprites('asyk', a.type ?? 'normal', id));
     });
     const easy = store.data.difficulty === 'easy' && (mode === 'campaign' || mode === 'training');
     this.round = new Round(mode, level, { bonusThrows: easy ? 1 : 0, snapshot: resume?.round });
