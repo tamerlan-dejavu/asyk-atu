@@ -5,10 +5,11 @@ import { decodeChallenge, challengeToLevel } from '../challenge/codec';
 import { applyLevelResult, store } from '../storage/save';
 import { HAPTIC, vibrate } from '../util/haptics';
 import { debugStats } from '../util/observability';
-import type { AsykType, BotLevel, GameMode, LevelDef, ResultEntry, ResumeState } from '../types';
+import type { AsykType, BotLevel, GameMode, LevelDef, ResultEntry, ResumeState, Ruleset } from '../types';
 import {
   AIM_ZONE_Y,
   ASYK,
+  LOFT,
   BLOCK,
   FIELD_H,
   FIELD_W,
@@ -25,6 +26,7 @@ import {
   ZONE,
 } from './config';
 import { chooseShot, type Shot } from './bot';
+import { launchVelocity, predictLanding, type Loft } from './physics/ballistics';
 import { AimController, type AimState } from './input/AimController';
 import { dailyLevel, dateKey } from './levels/daily';
 import { endlessWave, nextReserve } from './levels/endless';
@@ -42,6 +44,7 @@ import type { BodySnapshot } from './view3d/sync';
 import type { ThreeView } from './view3d/ThreeView';
 import { Round, specId } from './rules/round';
 import type { GameState } from './rules/turnState';
+import { dailyKey as rsDailyKey, levelKey, withRulesetPar } from './rules/ruleset';
 
 interface BodySprites {
   shadow: Phaser.GameObjects.Image;
@@ -133,6 +136,8 @@ export class GameScene extends Phaser.Scene {
   private botRnd: () => number = mulberry32(1);
   // ---- 3D-вид (эксперимент): только отображение, физика та же
   private view3d: ThreeView | null = null;
+  /** набор правил текущего раунда: классика или навес (бета) */
+  private ruleset: Ruleset = 'classic';
   private view3dLoading = false;
   private worldLayers: Phaser.GameObjects.Image[] = [];
   private fps3d = { t: 0, n: 0 };
@@ -250,6 +255,11 @@ export class GameScene extends Phaser.Scene {
 
     this.publish();
     this.applyViewSetting(false);
+  }
+
+  /** Высота броска (навес): последний выбор игрока. */
+  private currentLoft(): Loft {
+    return store.data.loft;
   }
 
   // ------------------------------------------------------------------ 3D-вид (эксперимент)
@@ -377,7 +387,8 @@ export class GameScene extends Phaser.Scene {
         if (this.sakaFade >= 0) alpha = 0.6;
       }
       const p = sb.body.position;
-      out.push({ id: sb.id, kind: sb.kind, type: sb.type, x: p.x, y: p.y, angle: sb.body.angle, z, alpha });
+      const tilt = this.ruleset === 'loft' && sb.kind === 'saka' && sb.z > 1 ? sim.tick * 0.35 : 0;
+      out.push({ id: sb.id, kind: sb.kind, type: sb.type, x: p.x, y: p.y, angle: sb.body.angle, z: z + sb.z, alpha, tilt });
     }
     if (this.idle3d)
       out.push({ id: 'idle', kind: 'saka', type: 'normal', x: this.idle3d.x, y: this.idle3d.y, angle: this.idle3d.angle, z: 0, alpha: 1 });
@@ -472,6 +483,8 @@ export class GameScene extends Phaser.Scene {
     scaleMul: number,
     flags: { soft: boolean; bounce: boolean },
     hlMul = 1,
+    hz = 0,
+    tilt = 0,
   ): void {
     const isSaka = s.kind === 'saka';
     const isBlock = s.type === 'block';
@@ -481,32 +494,37 @@ export class GameScene extends Phaser.Scene {
     const simpleKey = isSaka ? 'simpleShadowSaka' : isBlock ? 'simpleShadowBlock' : 'simpleShadowAsyk';
     const base = isSaka ? SAKA : isBlock ? { w: BLOCK.size, h: BLOCK.size } : ASYK;
     const zz = flags.bounce && !isBlock ? z : 0;
-    const scale = (1 + zz * 0.004) * scaleMul;
+    // навес: реальная высота тела — спрайт поднимается и растёт, тень остаётся на земле, растягивается и светлеет
+    const lift = zz + hz * 0.55;
+    const scale = (1 + zz * 0.004) * (1 + hz / 350) * scaleMul;
+    const squash = tilt ? 0.7 + 0.3 * Math.abs(Math.cos(tilt)) : 1; // «кувырок» в полёте (косметика)
+    const shGrow = 1 + hz / 200;
+    const shFade = Math.max(0.3, 1 - hz / 140);
     s.body
       .setVisible(true)
-      .setPosition(x, y - zz)
+      .setPosition(x, y - lift)
       .setRotation(angle)
-      .setDisplaySize(tex.w * scale, tex.h * scale)
+      .setDisplaySize(tex.w * scale, tex.h * scale * squash)
       .setAlpha(alpha);
     if (isBlock) s.hl.setVisible(false);
     else
       s.hl
         .setVisible(true)
-        .setPosition(x + HL_OFFSET.x * scale, y - zz + HL_OFFSET.y * scale)
+        .setPosition(x + HL_OFFSET.x * scale, y - lift + HL_OFFSET.y * scale)
         .setAlpha(alpha * 0.9 * hlMul);
     // Тень: смещение задаётся направлением света, а не углом тела; растёт и светлеет с z.
-    const off = SHADOW_OFFSET + zz * 0.9;
+    const off = SHADOW_OFFSET + zz * 0.9 + hz * 0.2;
     if (flags.soft) {
       s.shadow
         .setTexture(shKey)
         .setVisible(true)
         .setPosition(x + off, y + off * 1.1)
         .setRotation(angle)
-        .setDisplaySize(sh.w * scaleMul, sh.h * scaleMul)
-        .setAlpha(Math.max(0.1, (0.85 - zz * 0.05) * alpha));
+        .setDisplaySize(sh.w * scaleMul * shGrow, sh.h * scaleMul * shGrow)
+        .setAlpha(Math.max(0.1, (0.85 - zz * 0.05) * alpha * shFade));
       s.contact
         .setTexture(shKey)
-        .setVisible(zz < 1)
+        .setVisible(zz < 1 && hz < 1)
         .setPosition(x + 1, y + 1.5)
         .setRotation(angle)
         .setDisplaySize(sh.w * 0.82 * scaleMul, sh.h * 0.82 * scaleMul)
@@ -516,10 +534,10 @@ export class GameScene extends Phaser.Scene {
       s.shadow
         .setTexture(simpleKey)
         .setVisible(true)
-        .setPosition(x + 4, y + 5)
+        .setPosition(x + 4 + hz * 0.2, y + 5 + hz * 0.2)
         .setRotation(angle)
-        .setDisplaySize((base.w + 4) * scaleMul, (base.h + 4) * scaleMul)
-        .setAlpha(alpha);
+        .setDisplaySize((base.w + 4) * scaleMul * shGrow, (base.h + 4) * scaleMul * shGrow)
+        .setAlpha(alpha * shFade);
     }
   }
 
@@ -555,7 +573,7 @@ export class GameScene extends Phaser.Scene {
       }
       default:
         try {
-          return getLevel(req.levelId);
+          return withRulesetPar(getLevel(req.levelId), this.ruleset);
         } catch {
           return null;
         }
@@ -585,6 +603,9 @@ export class GameScene extends Phaser.Scene {
   private startRound(req: StartRequest, resume?: ResumeState): void {
     this.clearWorld();
     this.req = { ...req };
+    const fromCode = req.mode === 'custom' && req.code ? decodeChallenge(req.code) : null;
+    this.ruleset =
+      resume?.extra.ruleset ?? (fromCode?.ok ? (fromCode.challenge.ruleset ?? 'classic') : undefined) ?? req.ruleset ?? currentRuleset();
     this.coinsEarned = 0;
     const ex = resume?.extra;
     this.ctx = {
@@ -638,7 +659,7 @@ export class GameScene extends Phaser.Scene {
     this.level = level;
 
     const M = (Phaser.Physics.Matter as any).Matter;
-    const sim = new Sim(M, level.zone);
+    const sim = new Sim(M, level.zone, { loft: this.ruleset === 'loft' });
     this.sim = sim;
     level.asyks.forEach((a, i) => {
       const id = specId(a, i);
@@ -676,6 +697,10 @@ export class GameScene extends Phaser.Scene {
   private announceNewTypes(): void {
     const level = this.level;
     if (!level) return;
+    if (this.ruleset === 'loft' && !store.data.seenHints.includes('loft')) {
+      bus.emit('hint', { type: 'loft' });
+      return;
+    }
     for (const t of ['golden', 'heavy', 'block'] as const) {
       if (level.asyks.some((a) => a.type === t) && !store.data.seenHints.includes(t)) {
         bus.emit('hint', { type: t });
@@ -752,6 +777,7 @@ export class GameScene extends Phaser.Scene {
         dailyKey: r.mode === 'daily' ? this.ctx.dailyKey : undefined,
         challengeScore: this.req.challengeScore,
         challengeName: this.req.challengeName,
+        ruleset: this.ruleset === 'loft' ? 'loft' : undefined,
       },
     };
     store.update((s) => {
@@ -774,7 +800,10 @@ export class GameScene extends Phaser.Scene {
       .map((b) => ({ x: b.body.position.x, y: b.body.position.y, angle: b.body.angle, type: b.type }));
 
     const M = (Phaser.Physics.Matter as any).Matter;
-    const { shot } = await chooseShot(M, level.zone, specs, this.ctx.botLevel, this.botRnd, { deadlineMs: 800 });
+    const { shot } = await chooseShot(M, level.zone, specs, this.ctx.botLevel, this.botRnd, {
+      deadlineMs: 800,
+      loft: this.ruleset === 'loft',
+    });
     if (token !== this.botToken || !this.round) return;
     this.botThinking = false;
     // анимация «бот целится»: видимое оттягивание сақа 600–900 мс
@@ -833,13 +862,16 @@ export class GameScene extends Phaser.Scene {
     if (this.tutorial && this.round?.machine.state === 'AIMING') bus.emit('tutorial', { step: this.round.throwsUsed === 0 ? 0 : 3 });
   }
 
-  private onRelease(power: number, dirX: number, dirY: number): void {
+  private onRelease(power: number, dirX: number, dirY: number, loft?: Loft): void {
     const r = this.round;
     const sim = this.sim;
     if (!r || !sim || r.machine.state !== 'AIMING') return;
     this.powerText.setVisible(false);
     const v = POWER_MIN + (POWER_MAX - POWER_MIN) * power;
-    sim.launchSaka(dirX * v, dirY * v, Math.atan2(dirY, dirX));
+    if (this.ruleset === 'loft') {
+      const l = launchVelocity(power, loft ?? this.currentLoft(), dirX, dirY);
+      sim.launchSaka(l.vx, l.vy, Math.atan2(dirY, dirX), l.vz, LOFT.Z0);
+    } else sim.launchSaka(dirX * v, dirY * v, Math.atan2(dirY, dirX));
     this.sprites.set('saka', this.makeSprites('saka', 'normal'));
     this.hideSprites(this.idle);
     r.beginThrow();
@@ -873,7 +905,7 @@ export class GameScene extends Phaser.Scene {
         if (this.botAim.t >= this.botAim.dur) {
           const s = this.botAim.shot;
           this.botAim = null;
-          this.onRelease(s.power, s.dirX, s.dirY);
+          this.onRelease(s.power, s.dirX, s.dirY, s.loft);
         }
       }
       if (r.machine.state === 'FLYING' || r.machine.state === 'SETTLING') this.stepPhysics(dt);
@@ -997,6 +1029,29 @@ export class GameScene extends Phaser.Scene {
         bus.emit('float', { x: sp.x, y: sp.y, text: `+${r.valueOf(id)}`, kind: 'pts' });
       }
     }
+    for (const l of res.landed) {
+      // пыль, глухой удар, лёгкая тряска при приземлении сақа
+      const strength = Math.min(1, l.impact / 8);
+      if (l.impact > 1.2) {
+        const sp = this.toScreen(l.x, l.y);
+        this.fx.dust(sp.x, sp.y, strength * (l.id === 'saka' ? 1 : 0.5), fxFlags);
+      }
+      if (l.id === 'saka' && l.impact > 2) {
+        sfx.thud(strength);
+        vibrate(HAPTIC.hit);
+        if (l.impact > 4) {
+          if (this.view3d) this.view3d.kick();
+          else if (fxFlags.motion) this.cameras.main.shake(90, 0.0025 * strength);
+        }
+      } else if (l.impact > 2 && this.nowMs - this.lastHitSound > 45) {
+        this.lastHitSound = this.nowMs;
+        sfx.hit(strength * 0.5);
+      }
+    }
+    if (res.overshoot) {
+      bus.emit('banner', { key: 'overshoot' });
+      sfx.lose();
+    }
     for (const id of res.removed) {
       const s = this.sprites.get(id);
       if (s) {
@@ -1093,8 +1148,9 @@ export class GameScene extends Phaser.Scene {
       this.ctx.wave++;
       this.addCoins(COIN.wave);
       store.update((s) => {
-        s.endlessBest.wave = Math.max(s.endlessBest.wave, this.ctx.wave);
-        s.endlessBest.score = Math.max(s.endlessBest.score, this.ctx.totalScore);
+        const eb = this.ruleset === 'loft' ? s.endlessBestLoft : s.endlessBest;
+        eb.wave = Math.max(eb.wave, this.ctx.wave);
+        eb.score = Math.max(eb.score, this.ctx.totalScore);
       });
       this.ach({ type: 'wave', wave: this.ctx.wave });
       sfx.win();
@@ -1119,16 +1175,17 @@ export class GameScene extends Phaser.Scene {
 
     let endless: ResultDataEndless | undefined;
     if (mode === 'campaign') {
-      const first = store.data.levels[String(level.id)] === undefined;
+      const lk = levelKey(level.id, this.ruleset);
+      const first = store.data.levels[lk] === undefined;
       store.update((s) => {
-        const info = applyLevelResult(s, level.id, summary.score, summary.stars);
+        const info = applyLevelResult(s, level.id, summary.score, summary.stars, lk);
         newRecord = info.newRecord && summary.score > 0;
         bestStars = info.bestStars;
         if (level.id === 0 && summary.cleared) s.tutorialDone = true;
       });
       if (win && !(level.id === 0 && !first)) this.addCoins(levelCoins(summary.stars));
     } else if (mode === 'daily') {
-      const key = this.ctx.dailyKey;
+      const key = rsDailyKey(this.ctx.dailyKey, this.ruleset);
       const firstToday = store.data.daily[key] === undefined;
       store.update((s) => {
         const prev = s.daily[key]?.best ?? 0;
@@ -1137,17 +1194,24 @@ export class GameScene extends Phaser.Scene {
         dailyBest = s.daily[key].best;
       });
       if (firstToday) this.addCoins(COIN.daily);
-      this.ach({ type: 'daily', date: key });
+      this.ach({ type: 'daily', date: this.ctx.dailyKey });
     } else if (mode === 'endless') {
       const total = this.ctx.totalScore + summary.score;
       const reached = this.ctx.wave;
       let newBest = false;
       store.update((s) => {
-        newBest = total > s.endlessBest.score;
-        s.endlessBest.score = Math.max(s.endlessBest.score, total);
-        s.endlessBest.wave = Math.max(s.endlessBest.wave, reached);
+        const eb = this.ruleset === 'loft' ? s.endlessBestLoft : s.endlessBest;
+        newBest = total > eb.score;
+        eb.score = Math.max(eb.score, total);
+        eb.wave = Math.max(eb.wave, reached);
       });
-      endless = { wave: reached, total, best: store.data.endlessBest.score, newBest, runSeed: this.ctx.runSeed };
+      endless = {
+        wave: reached,
+        total,
+        best: (this.ruleset === 'loft' ? store.data.endlessBestLoft : store.data.endlessBest).score,
+        newBest,
+        runSeed: this.ctx.runSeed,
+      };
       newRecord = newBest;
     }
 
@@ -1183,6 +1247,7 @@ export class GameScene extends Phaser.Scene {
         endless,
         editorTest: this.req.editorTest,
         botLevel: mode === 'duel' ? this.ctx.botLevel : undefined,
+        ruleset: this.ruleset,
         challenge:
           mode === 'custom'
             ? { code: this.req.code, shortId: this.req.shortId, friendName: this.req.challengeName, friendScore: this.req.challengeScore }
@@ -1213,6 +1278,8 @@ export class GameScene extends Phaser.Scene {
           wave: r.mode === 'endless' ? this.ctx.wave : undefined,
           botLevel: r.mode === 'duel' ? this.ctx.botLevel : undefined,
           botThinking: this.botThinking || this.botAim !== null,
+          ruleset: this.ruleset,
+          loft: store.data.loft,
           showHint: !this.firstThrow && !this.tutorial,
         }
       : {
@@ -1227,6 +1294,8 @@ export class GameScene extends Phaser.Scene {
           scores: [0, 0],
           versusLeft: [0, 0],
           showHint: false,
+          ruleset: currentRuleset(),
+          loft: store.data.loft,
         };
     bus.emit('hud', hud);
     window.__asyk = {
@@ -1268,7 +1337,8 @@ export class GameScene extends Phaser.Scene {
       if (this.sakaFade >= 0) alpha = 0.55;
     }
     if (sb.type === 'golden') hlMul = 0.7 + 0.3 * Math.sin(this.nowMs / 210 + p.x * 0.05); // мерцание
-    this.place(sp, p.x, p.y, sb.body.angle, z, alpha, scale, f, hlMul);
+    const tilt = this.ruleset === 'loft' && sb.kind === 'saka' && sb.z > 1 ? this.sim!.tick * 0.35 : 0;
+    this.place(sp, p.x, p.y, sb.body.angle, z, alpha, scale, f, hlMul, sb.z, tilt);
   }
 
   // ------------------------------------------------------------------ прицел (плоский, не искажается параллаксом)
@@ -1327,13 +1397,18 @@ export class GameScene extends Phaser.Scene {
 
     if (a.valid || a.mode === 'keys') {
       // «Лёгкий» режим: длинная направляющая с грубой дальностью (v / frictionAir)
-      if (store.data.difficulty === 'easy' && !botTurn) {
+      if (store.data.difficulty === 'easy' && !botTurn && this.ruleset !== 'loft') {
         const v = POWER_MIN + (POWER_MAX - POWER_MIN) * power;
         const reach = Math.min(v / SAKA.frictionAir, 1000);
         g.fillStyle(0xf6ecd0, 0.55);
         for (let d = 90; d < reach; d += 24) g.fillCircle(p0.x + a.dirX * d, p0.y + a.dirY * d, 3);
         g.lineStyle(3, 0xf6ecd0, 0.7);
         g.strokeCircle(p0.x + a.dirX * reach, p0.y + a.dirY * reach, 16);
+      }
+      // навес: маркер точки приземления на земле (кольцо с крестом); на «Лёгком» — ещё точка первого подскока
+      if (this.ruleset === 'loft') {
+        this.drawLanding(g, power, a.dirX, a.dirY, col, store.data.difficulty === 'easy' && !botTurn);
+        return this.drawRubber(g, a);
       }
       // пунктир направления: длина зависит от силы (полную траекторию не рисуем)
       const start = 70;
@@ -1358,6 +1433,42 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0xf6ecd0, 0.7);
       g.fillCircle(a.cx, a.cy, 8);
     }
+  }
+
+  /** Маркер приземления (навес): линия от сақа к точке приземления, кольцо с крестом; в 3D — в перспективе. */
+  private drawLanding(g: Phaser.GameObjects.Graphics, power: number, dirX: number, dirY: number, col: number, withBounce: boolean): void {
+    const p0 = this.idlePos;
+    const land = predictLanding(power, this.currentLoft(), dirX, dirY, p0.x, p0.y);
+    const dist = Math.hypot(land.x - p0.x, land.y - p0.y);
+    g.lineStyle(5, col, 0.9);
+    for (let d = 70; d < dist - 24; d += 26) {
+      const d2 = Math.min(dist - 24, d + 14);
+      this.lineW(g, p0.x + dirX * d, p0.y + dirY * d, p0.x + dirX * d2, p0.y + dirY * d2);
+    }
+    g.lineStyle(5, 0x2b1a0e, 0.45);
+    this.circleW(g, land.x, land.y, 24);
+    g.lineStyle(4, col, 1);
+    this.circleW(g, land.x, land.y, 22);
+    const nx = -dirY;
+    const ny = dirX;
+    this.lineW(g, land.x - dirX * 14, land.y - dirY * 14, land.x + dirX * 14, land.y + dirY * 14);
+    this.lineW(g, land.x - nx * 14, land.y - ny * 14, land.x + nx * 14, land.y + ny * 14);
+    if (withBounce && land.bounce) {
+      g.lineStyle(3, 0xf6ecd0, 0.8);
+      this.circleW(g, land.bounce.x, land.bounce.y, 12);
+    }
+  }
+
+  /** «Резинка» жеста: якорь → палец (в экранных координатах). */
+  private drawRubber(g: Phaser.GameObjects.Graphics, a: AimState): void {
+    if (a.mode !== 'pointer') return;
+    const s0 = this.view3d ? { x: a.sax, y: a.say } : { x: a.ax, y: a.ay };
+    const s1 = this.view3d ? { x: a.scx, y: a.scy } : { x: a.cx, y: a.cy };
+    g.lineStyle(3, 0xf6ecd0, 0.55);
+    g.lineBetween(s0.x, s0.y, s1.x, s1.y);
+    g.strokeCircle(s0.x, s0.y, 12);
+    g.fillStyle(0xf6ecd0, 0.7);
+    g.fillCircle(s1.x, s1.y, 8);
   }
 
   // ------------------------------------------------------------------ прицел в 3D: точки на земле → проекция на экран
@@ -1420,7 +1531,7 @@ export class GameScene extends Phaser.Scene {
     if (a.valid || a.mode === 'keys') {
       // в 3D направляющая длиннее, чем в 2D (глубину оценивать труднее); на «Лёгком» — ещё длиннее
       const easy = store.data.difficulty === 'easy' && !botTurn;
-      if (easy) {
+      if (easy && this.ruleset !== 'loft') {
         const v = POWER_MIN + (POWER_MAX - POWER_MIN) * power;
         const reach = Math.min(v / SAKA.frictionAir, 1000);
         g.fillStyle(0xf6ecd0, 0.6);
@@ -1430,6 +1541,10 @@ export class GameScene extends Phaser.Scene {
         }
         g.lineStyle(3, 0xf6ecd0, 0.75);
         this.circleW(g, p0.x + a.dirX * reach, p0.y + a.dirY * reach, 16);
+      }
+      if (this.ruleset === 'loft') {
+        this.drawLanding(g, power, a.dirX, a.dirY, col, easy);
+        return this.drawRubber(g, a);
       }
       const start = 70;
       const len = (60 + power * 360) * (easy ? 1.3 : 1);
@@ -1469,6 +1584,13 @@ function hasWebGLQuick(): boolean {
   } catch {
     return false;
   }
+}
+
+/** Набор правил по умолчанию: ?ruleset=loft на сессию, иначе настройка (по умолчанию классика). */
+export function currentRuleset(): Ruleset {
+  const q = new URLSearchParams(location.search).get('ruleset');
+  if (q === 'loft' || q === 'classic') return q;
+  return store.data.ruleset;
 }
 
 interface ResultDataEndless {

@@ -12,6 +12,8 @@ export interface BodySnapshot {
   z: number;
   /** 1 — видно полностью; меньше — исчезает (выбит / сақа гаснет) */
   alpha: number;
+  /** навес: «кувырок» вокруг длинной оси в полёте (только визуал) */
+  tilt?: number;
 }
 
 export interface MeshTransform {

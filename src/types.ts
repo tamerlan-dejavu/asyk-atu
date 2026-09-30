@@ -3,6 +3,10 @@ export type Quality = 'auto' | 'high' | 'low';
 export type GameMode = 'campaign' | 'training' | 'versus' | 'daily' | 'endless' | 'duel' | 'custom';
 export type Difficulty = 'easy' | 'normal';
 export type BotLevel = 'easy' | 'normal' | 'hard';
+/** Набор правил: классический бросок или навес с высотой (бета). */
+export type Ruleset = 'classic' | 'loft';
+/** Высота броска в наборе «навес». */
+export type LoftLevel = 'low' | 'mid' | 'high';
 
 /** Тип тела в кону. block — статичное препятствие (не выбивается, очков не даёт). */
 export type AsykType = 'normal' | 'golden' | 'heavy' | 'block';
@@ -92,6 +96,7 @@ export interface ResumeState {
     dailyKey?: string;
     challengeScore?: number;
     challengeName?: string;
+    ruleset?: Ruleset;
   };
 }
 
@@ -145,4 +150,10 @@ export interface SaveV2 extends Omit<SaveV1, 'v'> {
   viewChosen: boolean;
   /** 3D автоматически выключен на этом устройстве (нет WebGL / низкий FPS) */
   view3dBlocked: boolean;
+  /** набор правил по умолчанию (классика) */
+  ruleset: Ruleset;
+  /** последняя выбранная высота броска */
+  loft: LoftLevel;
+  /** рекорд бесконечного режима в наборе «навес» (раздельно с классикой) */
+  endlessBestLoft: { score: number; wave: number };
 }

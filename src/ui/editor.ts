@@ -16,6 +16,7 @@ import { bonePolygon } from '../game/physics/bodies';
 import { t } from '../i18n';
 import type { AsykSpec, AsykType } from '../types';
 import { ornament } from './common';
+import { store } from '../storage/save';
 
 /** Черновик редактируемого испытания (живёт, пока открыта страница). */
 export interface Draft {
@@ -66,7 +67,7 @@ export function loadFromCode(code: string, id: string | null, verified: boolean)
 
 /** Ключ расстановки: изменение объектов или числа бросков сбрасывает «пройдено». */
 export function layoutKey(d: Draft = draft): string {
-  return JSON.stringify([d.throws, d.asyks.map((a) => quantize(a))]);
+  return JSON.stringify([d.throws, store.data.ruleset, d.asyks.map((a) => quantize(a))]);
 }
 
 export const isVerified = (): boolean => draft.verifiedKey !== null && draft.verifiedKey === layoutKey();
@@ -79,7 +80,13 @@ export function realCount(d: Draft = draft): number {
 }
 
 export function toChallenge(d: Draft = draft): Challenge {
-  return { name: cleanName(d.name) || t('namePlaceholder'), throws: d.throws, par: d.par, asyks: d.asyks.map(quantize) };
+  return {
+    name: cleanName(d.name) || t('namePlaceholder'),
+    throws: d.throws,
+    par: d.par,
+    asyks: d.asyks.map(quantize),
+    ruleset: store.data.ruleset,
+  };
 }
 
 export function currentCode(): string {

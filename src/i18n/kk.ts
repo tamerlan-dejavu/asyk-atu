@@ -128,6 +128,20 @@ export const kk: Dict = {
   qualityHint: 'Төмен сапа параллаксты, секіруді және жұмсақ көлеңкені өшіреді', // verify: native speaker
   mute: 'Дыбыс', // verify: native speaker
   rotate: 'Құрылғыны тігінен бұр', // verify: native speaker
+  overshoot: 'Асып кетті!', // verify: native speaker
+  ruleset: 'Лақтыру', // verify: native speaker
+  rulesetClassic: 'Классикалық', // verify: native speaker
+  rulesetLoft: 'Биіктен (бета)', // verify: native speaker
+  rulesetHint:
+    'Биіктен: сақа доғамен ұшады, жерден серпіледі, тастардың үстінен асып кетуі мүмкін. Биіктікті оң жақтағы түймелермен таңда.', // verify: native speaker
+  modeLoftDesc: 'Биіктікпен лақтыру: доға, серпілу, тас үстінен ұшу', // verify: native speaker
+  loftLow: 'Төмен', // verify: native speaker
+  loftMid: 'Орташа', // verify: native speaker
+  loftHigh: 'Биік', // verify: native speaker
+  loftHeight: 'Лақтыру биіктігі', // verify: native speaker
+  hintLoft:
+    'Биіктен: оң жақтан биіктікті таңда. Биік лақтыру тас пен асықтан асады, төмені әрі қарай сырғиды. Жердегі шеңбер — түсетін нүкте.', // verify: native speaker
+  rulesetOf: 'Ереже: {name}', // verify: native speaker
   view: 'Көрініс', // verify: native speaker
   view2d: '2D', // verify: native speaker
   view3d: '3D', // verify: native speaker

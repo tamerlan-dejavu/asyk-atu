@@ -4,6 +4,7 @@ import { LEVELS } from '../game/levels/levels';
 import { PRO_LEVELS } from '../game/levels/levels-pro';
 import { t, type Key } from '../i18n';
 import { store } from '../storage/save';
+import { cloudKey } from '../game/rules/ruleset';
 import { BUILD } from '../util/build';
 import { levelName, ornament, stars, toast, u } from './common';
 
@@ -197,7 +198,7 @@ export async function loadBoard(rerender: () => void): Promise<void> {
       : cu.lbTab === 'endless'
         ? (['endless', 'endless'] as const)
         : (['level', `level:${cu.lbLevel}`] as const);
-  const rows = await cloud.leaderboard(mode, key);
+  const rows = await cloud.leaderboard(mode, cloudKey(key, store.data.ruleset));
   cu.lbRows = rows ?? 'error';
   rerender();
 }

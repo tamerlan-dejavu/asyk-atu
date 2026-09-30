@@ -92,6 +92,13 @@ class Sfx {
     this.burst(0.05, 0.3 * s, 2400, 0, 2);
   }
 
+  /** Глухой удар о землю при приземлении (навес). */
+  thud(strength: number): void {
+    const s = Math.min(1, Math.max(0.2, strength));
+    this.tone(90 + s * 60, 0.16, 'sine', 0.25 * s, 0, 45);
+    this.burst(0.12, 0.25 * s, 380, 0, 0.7);
+  }
+
   out(): void {
     this.tone(520, 0.14, 'sine', 0.2, 0, 900);
   }

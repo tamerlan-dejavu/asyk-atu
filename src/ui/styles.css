@@ -1588,3 +1588,62 @@ input:focus-visible {
   pointer-events: none;
   display: block;
 }
+
+/* Навес (бета): кнопки высоты броска у большого пальца — справа, над линией броска */
+.loftbar {
+  pointer-events: auto;
+  position: absolute;
+  right: 2.5%;
+  bottom: 1.5%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+.loftbtn {
+  width: 3.1em;
+  height: 3.1em;
+  border-radius: 50%;
+  border: 0.14em solid var(--cream);
+  background: var(--glass);
+  color: var(--cream);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+.loftbtn svg {
+  width: 1.8em;
+  height: 1.5em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.loftbtn small {
+  font-size: 0.55em;
+  line-height: 1;
+}
+.loftbtn.on {
+  background: var(--turq);
+  border-color: #ffd35a;
+  color: #fff;
+  box-shadow: 0 0 0.6em rgba(255, 211, 90, 0.6);
+}
+.rs-switch .chip {
+  background: var(--terra);
+}
+.rs-switch .chip.on {
+  background: var(--turq);
+}
+.linkbtn {
+  pointer-events: auto;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--turq);
+  font-weight: 700;
+  text-decoration: underline;
+}

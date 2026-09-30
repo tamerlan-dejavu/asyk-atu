@@ -1,4 +1,5 @@
-import { ASYK_VALUE, POWER_MAX, POWER_MIN, SAKA_START, MAX_AIM_ANGLE } from './config';
+import { ASYK_VALUE, LOFT, POWER_MAX, POWER_MIN, SAKA_START, MAX_AIM_ANGLE } from './config';
+import { launchVelocity, LOFTS, type Loft } from './physics/ballistics';
 import { Sim } from './physics/sim';
 import type { MatterNS } from './physics/bodies';
 import { throwScoreValues } from './rules/scoring';
@@ -8,6 +9,8 @@ export interface Shot {
   power: number;
   dirX: number;
   dirY: number;
+  /** навес: высота броска (в классике не задана) */
+  loft?: Loft;
 }
 
 export interface Candidate extends Shot {
@@ -23,6 +26,8 @@ export const BOT_NOISE: Record<BotLevel, { angleDeg: number; power: number; pick
 };
 
 const POWERS = [0.6, 0.75, 0.9, 1];
+/** Навес: сила определяет дальность приземления (≈ линейно): кон на 49–93 % силы; низкий бросок скользит дальше. */
+const LOFT_POWERS: Record<Loft, number[]> = { low: [0.25, 0.38, 0.5, 0.62], mid: [0.45, 0.58, 0.72, 0.86], high: [0.48, 0.6, 0.74, 0.88] };
 const D = Math.PI / 180;
 
 /** Направление на точку с линии броска: угол от «вверх», в допустимых пределах. */
@@ -31,8 +36,8 @@ function angleTo(x: number, y: number): number {
   return Math.max(-MAX_AIM_ANGLE, Math.min(MAX_AIM_ANGLE, a));
 }
 
-/** ≈ 96 кандидатов: 24 направления (на цели ± небольшой разброс) × 4 силы. */
-export function candidateShots(specs: AsykSpec[]): Shot[] {
+/** ≈ 96 кандидатов: 24 направления (на цели ± небольшой разброс) × 4 силы; в навесе ещё × высоты. */
+export function candidateShots(specs: AsykSpec[], lofts: Loft[] | null = null): Shot[] {
   const targets = specs
     .filter((s) => s.type !== 'block')
     .sort((a, b) => ASYK_VALUE[b.type ?? 'normal'] - ASYK_VALUE[a.type ?? 'normal'])
@@ -45,16 +50,28 @@ export function candidateShots(specs: AsykSpec[]): Shot[] {
   for (let deg = -33; angles.length < 24; deg += 6) angles.push(deg * D);
   const uniq = angles.slice(0, 24);
   const out: Shot[] = [];
-  for (const a of uniq) for (const p of POWERS) out.push({ power: p, dirX: Math.sin(a), dirY: -Math.cos(a) });
+  if (!lofts) {
+    for (const a of uniq) for (const p of POWERS) out.push({ power: p, dirX: Math.sin(a), dirY: -Math.cos(a) });
+    return out;
+  }
+  // высоты чередуются внутри направления: отсечка по времени не выбрасывает целую высоту
+  for (const a of uniq)
+    for (let i = 0; i < 4; i++)
+      for (const l of lofts) out.push({ power: LOFT_POWERS[l][i], dirX: Math.sin(a), dirY: -Math.cos(a), loft: l });
   return out;
 }
 
 /** Симуляция одного броска в headless-мире тем же Matter и теми же константами. */
 export function simulateShot(M: MatterNS, zone: ZoneSpec, specs: AsykSpec[], shot: Shot): { points: number; out: number; ticks: number } {
-  const sim = new Sim(M, zone);
+  const sim = new Sim(M, zone, { loft: Boolean(shot.loft) });
   specs.forEach((s, i) => sim.addAsyk(`a${i}`, s));
-  const v = POWER_MIN + (POWER_MAX - POWER_MIN) * shot.power;
-  sim.launchSaka(shot.dirX * v, shot.dirY * v, Math.atan2(shot.dirY, shot.dirX));
+  if (shot.loft) {
+    const l = launchVelocity(shot.power, shot.loft, shot.dirX, shot.dirY);
+    sim.launchSaka(l.vx, l.vy, Math.atan2(shot.dirY, shot.dirX), l.vz, LOFT.Z0);
+  } else {
+    const v = POWER_MIN + (POWER_MAX - POWER_MIN) * shot.power;
+    sim.launchSaka(shot.dirX * v, shot.dirY * v, Math.atan2(shot.dirY, shot.dirX));
+  }
   const values: number[] = [];
   let ticks = 0;
   while (!sim.settled && ticks < 600) {
@@ -76,7 +93,7 @@ export function applyNoise(shot: Shot, level: BotLevel, rnd: () => number): Shot
   const a = Math.atan2(shot.dirX, -shot.dirY) + gaussian(rnd) * n.angleDeg * D;
   const clamped = Math.max(-MAX_AIM_ANGLE, Math.min(MAX_AIM_ANGLE, a));
   const power = Math.max(0.05, Math.min(1, shot.power * (1 + gaussian(rnd) * n.power)));
-  return { power, dirX: Math.sin(clamped), dirY: -Math.cos(clamped) };
+  return { power, dirX: Math.sin(clamped), dirY: -Math.cos(clamped), loft: shot.loft };
 }
 
 export function pickCandidate(sorted: Candidate[], level: BotLevel, rnd: () => number): Candidate {
@@ -95,6 +112,8 @@ export interface BotOptions {
   deadlineMs?: number;
   /** пауза для интерфейса, чтобы не подвешивать кадры */
   yieldEveryMs?: number;
+  /** набор правил «навес»: перебор ещё и по высоте */
+  loft?: boolean;
   now?: () => number;
 }
 
@@ -116,7 +135,9 @@ export async function chooseShot(
   const start = now();
   let lastYield = start;
   const scored: Candidate[] = [];
-  for (const c of candidateShots(specs)) {
+  // «Лёгкий» бот в навесе чаще берёт среднюю высоту
+  const lofts = opts.loft ? (level === 'easy' && rnd() < 0.75 ? (['mid'] as Loft[]) : LOFTS) : null;
+  for (const c of candidateShots(specs, lofts)) {
     const r = simulateShot(M, zone, specs, c);
     scored.push({ ...c, points: r.points, out: r.out });
     const t = now();
