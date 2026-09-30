@@ -5,15 +5,7 @@
  * PAUSED — из любого игрового состояния, возврат в то же.
  */
 export type GameState =
-  | 'MENU'
-  | 'LEVEL_INTRO'
-  | 'AIMING'
-  | 'FLYING'
-  | 'SETTLING'
-  | 'RESOLVING'
-  | 'LEVEL_COMPLETE'
-  | 'LEVEL_FAILED'
-  | 'PAUSED';
+  'MENU' | 'LEVEL_INTRO' | 'AIMING' | 'FLYING' | 'SETTLING' | 'RESOLVING' | 'LEVEL_COMPLETE' | 'LEVEL_FAILED' | 'PAUSED';
 
 const ALLOWED: Record<GameState, GameState[]> = {
   MENU: ['LEVEL_INTRO'],

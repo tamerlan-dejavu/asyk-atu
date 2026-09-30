@@ -17,8 +17,7 @@ describe('levels', () => {
       });
       it('асыки не перекрываются на старте', () => {
         for (let i = 0; i < level.asyks.length; i++)
-          for (let j = i + 1; j < level.asyks.length; j++)
-            expect(asykGap(level.asyks[i], level.asyks[j])).toBeGreaterThan(0);
+          for (let j = i + 1; j < level.asyks.length; j++) expect(asykGap(level.asyks[i], level.asyks[j])).toBeGreaterThan(0);
       });
       it('par ≤ throws и уровень проходим (асыков ≤ throws·3)', () => {
         if (level.par !== null) expect(level.par).toBeLessThanOrEqual(level.throws);

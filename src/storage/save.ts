@@ -17,6 +17,8 @@ import type {
 export const SAVE_KEY = 'asyk-atu:v1';
 export const BACKUP_KEY = 'asyk-atu:backup';
 export const BACKUP_V1_KEY = 'asyk-atu:backup-v1';
+/** Время последнего локального изменения (для слияния с облаком). */
+export const UPDATED_KEY = 'asyk-atu:updated';
 /** Последний уровень основной кампании (главы «Двор» и «Дала»). */
 export const MAX_LEVEL = 10;
 /** Последний из дополнительных (Pro) уровней. */
@@ -64,8 +66,7 @@ export function defaultSave(): SaveV2 {
 }
 
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
-const num = (x: unknown, d: number, min = 0): number =>
-  typeof x === 'number' && Number.isFinite(x) ? Math.max(min, x) : d;
+const num = (x: unknown, d: number, min = 0): number => (typeof x === 'number' && Number.isFinite(x) ? Math.max(min, x) : d);
 const str = (x: unknown, d: string, max = 200): string => (typeof x === 'string' ? x.slice(0, max) : d);
 const MODES: GameMode[] = ['campaign', 'training', 'versus', 'daily', 'endless', 'duel', 'custom'];
 const TYPES: AsykType[] = ['normal', 'golden', 'heavy', 'block'];
@@ -167,7 +168,13 @@ function sanitizeCustom(raw: unknown): CustomLevel[] {
   const out: CustomLevel[] = [];
   for (const e of raw) {
     if (!isObj(e) || typeof e.code !== 'string' || e.code.length > 600) continue;
-    out.push({ id: str(e.id, String(out.length), 24), name: str(e.name, '', 24), code: e.code, verified: e.verified === true, ts: num(e.ts, 0) });
+    out.push({
+      id: str(e.id, String(out.length), 24),
+      name: str(e.name, '', 24),
+      code: e.code,
+      verified: e.verified === true,
+      ts: num(e.ts, 0),
+    });
   }
   return out.slice(0, CUSTOM_LIMIT);
 }
@@ -195,7 +202,8 @@ export function sanitize(raw: unknown): SaveV2 {
   const names = Array.isArray(r.playerNames) ? r.playerNames : [];
   const isV2 = r.v === 2;
   const ach: Record<string, number> = {};
-  if (isV2 && isObj(r.achievements)) for (const [k, v] of Object.entries(r.achievements)) if (typeof v === 'number') ach[k.slice(0, 30)] = v;
+  if (isV2 && isObj(r.achievements))
+    for (const [k, v] of Object.entries(r.achievements)) if (typeof v === 'number') ach[k.slice(0, 30)] = v;
   const eq = isV2 && isObj(r.equipped) ? r.equipped : {};
   const owned = isV2 && Array.isArray(r.owned) ? r.owned.filter((s): s is string => typeof s === 'string').slice(0, 60) : [];
   for (const id of d.owned) if (!owned.includes(id)) owned.push(id);
@@ -217,10 +225,7 @@ export function sanitize(raw: unknown): SaveV2 {
       hits: Math.floor(num(st.hits, 0)),
     },
     daily,
-    playerNames: [
-      typeof names[0] === 'string' ? names[0].slice(0, 16) : '',
-      typeof names[1] === 'string' ? names[1].slice(0, 16) : '',
-    ],
+    playerNames: [typeof names[0] === 'string' ? names[0].slice(0, 16) : '', typeof names[1] === 'string' ? names[1].slice(0, 16) : ''],
     resume: isV2 ? sanitizeResume(r.resume) : null,
     history: isV2 ? sanitizeHistory(r.history) : [],
     achievements: ach,
@@ -264,9 +269,23 @@ export function getStorage(): StorageLike | null {
 /** Хранилище сохранений: вся работа с localStorage — только здесь, всё в try/catch. */
 export class SaveStore {
   private cache: SaveV2 = defaultSave();
+  private listeners = new Set<() => void>();
+  /** время последнего изменения (мс) */
+  updatedAt = 0;
 
   constructor(private storage: StorageLike | null) {
     this.load();
+    try {
+      this.updatedAt = Number(this.storage?.getItem(UPDATED_KEY)) || 0;
+    } catch {
+      this.updatedAt = 0;
+    }
+  }
+
+  /** Подписка на изменения (облачная синхронизация). */
+  onChange(fn: () => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
   }
 
   get data(): SaveV2 {
@@ -316,11 +335,26 @@ export class SaveStore {
   }
 
   persist(): void {
+    this.updatedAt = Date.now();
     try {
       this.storage?.setItem(SAVE_KEY, JSON.stringify(this.cache));
+      this.storage?.setItem(UPDATED_KEY, String(this.updatedAt));
     } catch {
       /* квота/приватный режим: игра продолжает работать без сохранения */
     }
+    for (const fn of this.listeners) {
+      try {
+        fn();
+      } catch {
+        /* слушатель не должен ломать сохранение */
+      }
+    }
+  }
+
+  /** Заменить сохранение целиком (результат слияния с облаком). */
+  replace(next: SaveV2): void {
+    this.cache = sanitize(next);
+    this.persist();
   }
 
   update(fn: (s: SaveV2) => void): SaveV2 {

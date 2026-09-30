@@ -5,6 +5,7 @@ import { ACHIEVEMENTS, progressOf } from '../game/rules/achievements';
 import { t, type Key } from '../i18n';
 import { MAX_LEVEL, store } from '../storage/save';
 import { esc, levelName, modeLabel, ornament, stars } from './common';
+import { cloudHistoryBlock } from './cloudui';
 
 export type RecordsTab = 'levels' | 'history' | 'stats' | 'ach';
 
@@ -39,7 +40,7 @@ function levelsTab(confirmReset: boolean): string {
 
 function historyTab(): string {
   const h = [...store.data.history].reverse();
-  if (h.length === 0) return `<p class="small">${t('emptyList')}</p>`;
+  if (h.length === 0) return `<p class="small">${t('emptyList')}</p>${cloudHistoryBlock()}`;
   return `<ul class="hist">${h
     .map((e) => {
       const d = new Date(e.ts);
@@ -47,7 +48,7 @@ function historyTab(): string {
       const ref = e.mode === 'campaign' ? levelName(Number(e.ref.replace('L', ''))) : esc(e.ref);
       return `<li><span class="hm">${modeLabel(e.mode)}<small>${ref} · ${when}</small></span>${e.mode === 'campaign' ? stars(e.stars) : ''}<b>${e.score}</b></li>`;
     })
-    .join('')}</ul>`;
+    .join('')}</ul>${cloudHistoryBlock()}`;
 }
 
 /** Простой график последних 10 результатов (SVG, без библиотек). */

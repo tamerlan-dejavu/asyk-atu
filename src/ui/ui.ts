@@ -12,11 +12,23 @@ import { getLang, onLang, setLang, t, type Key } from '../i18n';
 import { activatePro, buyItem, equipItem, itemById } from '../shop/catalog';
 import { CUSTOM_LIMIT, store } from '../storage/save';
 import type { BotLevel, CustomLevel, Difficulty, Lang, Quality } from '../types';
-import { $, botLabel, HORN, levelName, modeLabel, ornament, playerName, sakaIcon, stars, toast } from './common';
+import { $, botLabel, HORN, levelName, modeLabel, ornament, playerName, sakaIcon, setHtml, stars, toast, u } from './common';
 import * as ed from './editor';
 import { recordsScreen, type RecordsTab } from './records';
 import { makeLink, senderName, shareCard, shareLink } from './share';
 import { shopScreen, type ShopOverlay } from './shop';
+import { cloud, type BoardRow } from '../cloud/cloud';
+import {
+  aboutBlock,
+  bindProfile,
+  boardTable,
+  handleCloudAction,
+  leaderboardScreen,
+  loadBoard,
+  loadCloudHistory,
+  profileScreen,
+  syncLabel,
+} from './cloudui';
 
 type Screen =
   | 'menu'
@@ -32,7 +44,9 @@ type Screen =
   | 'editor'
   | 'mine'
   | 'shop'
-  | 'challenge';
+  | 'challenge'
+  | 'profile'
+  | 'board';
 
 let screen: Screen = 'menu';
 let gstate: GameState = 'MENU';
@@ -47,33 +61,13 @@ let recordsTab: RecordsTab = 'levels';
 let shopOverlay: ShopOverlay = 'none';
 let bannerTimer = 0;
 let pendingLink: LinkKind | null = null;
+/** вызов по короткой ссылке: id, число прохождений и «кто уже прошёл» */
+let pendingShort: { id: string; plays: number; rows: BoardRow[] | null | 'loading' | 'error' } | null = null;
+let linkLoading = false;
 let lastStart: StartRequest | null = null;
 let hintType: 'golden' | 'heavy' | 'block' | null = null;
 const achQueue: string[] = [];
 let achShowing = false;
-
-// ------------------------------------------------------------------ пользовательский текст — только через textContent
-const userTexts = new Map<number, string>();
-let uSeq = 0;
-/** Место для строки пользователя (имя, название): вставляется в DOM через textContent, без разметки. */
-function u(s: string): string {
-  if (userTexts.size > 400) userTexts.clear();
-  const id = ++uSeq;
-  userTexts.set(id, s);
-  return `<bdi data-u="${id}"></bdi>`;
-}
-function fillUser(root: ParentNode): void {
-  root.querySelectorAll<HTMLElement>('[data-u]').forEach((el) => {
-    const id = Number(el.dataset.u);
-    el.textContent = userTexts.get(id) ?? '';
-    userTexts.delete(id);
-    el.removeAttribute('data-u');
-  });
-}
-function setHtml(el: HTMLElement, html: string): void {
-  el.innerHTML = html;
-  fillUser(el);
-}
 
 const lvName = (id: number, custom?: string): string => (custom ? u(custom) : levelName(id));
 
@@ -85,7 +79,12 @@ function menuScreen(): string {
   const rs = FEATURES.resume ? store.data.resume : null;
   const cont = rs
     ? `<button class="btn primary big cont" data-act="continue">${t('continue')}<small>${t('continueInfo', {
-        name: rs.mode === 'endless' ? t('waveLabel', { n: rs.extra.wave ?? 1 }) : rs.mode === 'campaign' ? levelName(rs.levelId) : modeLabel(rs.mode),
+        name:
+          rs.mode === 'endless'
+            ? t('waveLabel', { n: rs.extra.wave ?? 1 })
+            : rs.mode === 'campaign'
+              ? levelName(rs.levelId)
+              : modeLabel(rs.mode),
         score: (rs.extra.totalScore ?? 0) + rs.round.scores[0] + (rs.mode === 'versus' || rs.mode === 'duel' ? rs.round.scores[1] : 0),
       })}</small></button>`
     : '';
@@ -106,10 +105,12 @@ function menuScreen(): string {
       </div>
       <button class="btn sec" data-act="goto" data-arg="settings">${t('settings')}</button>
     </div>
+    ${FEATURES.cloud ? `<div class="menu-sync">${syncLabel()}</div>` : ''}
     <div class="menu-foot">
       <div class="chips" role="group" aria-label="${t('language')}">${langBtn('ru', 'RU')}${langBtn('kk', 'ҚАЗ')}${langBtn('en', 'EN')}</div>
       <div class="chips">
         ${FEATURES.shop ? `<span class="coinbadge" aria-label="${t('coins')}">🪙 ${store.data.coins}</span>` : ''}
+        ${FEATURES.cloud ? `<button class="chip icon${cloud.signedIn ? ' on' : ''}" data-act="goto" data-arg="profile" aria-label="${t('profile')}">👤</button>` : ''}
         <button class="chip icon${store.data.sound ? ' on' : ''}" data-act="sound" aria-pressed="${store.data.sound}" aria-label="${t('sound')}">${store.data.sound ? '🔊' : '🔇'}</button>
       </div>
     </div>
@@ -132,6 +133,7 @@ function modesScreen(): string {
       ${card('goto', 'daily', '📅', 'daily', 'modeDailyDesc', db !== undefined ? ` · ${t('best')}: ${db}` : '')}
       ${FEATURES.editor ? card('editorNew', '', '✏', 'editor', 'modeEditorDesc') : ''}
       ${FEATURES.editor ? card('goto', 'mine', '📂', 'myLevels', 'modeMineDesc', ` · ${store.data.customLevels.length}/${CUSTOM_LIMIT}`) : ''}
+      ${FEATURES.cloud ? card('goto', 'board', '🏆', 'leaderboard', 'modeBoardDesc') : ''}
       ${FEATURES.shop ? card('goto', 'shop', '🪙', 'shop', 'modeShopDesc', ` · ${store.data.coins}`) : ''}
     </div>
   </section>`;
@@ -153,15 +155,22 @@ function levelCard(l: { id: number; throws: number; par: number | null }, open: 
 function levelsScreen(): string {
   const s = store.data;
   const open = (id: number) => id <= s.unlocked;
-  const ch = (key: Key, list: typeof LEVELS) => `<h3 class="chapter">${t(key)}</h3><div class="grid">${list.map((l) => levelCard(l, open(l.id))).join('')}</div>`;
+  const ch = (key: Key, list: typeof LEVELS) =>
+    `<h3 class="chapter">${t(key)}</h3><div class="grid">${list.map((l) => levelCard(l, open(l.id))).join('')}</div>`;
   return `
   <section class="screen">
     <header class="bar"><button class="btn sec sm" data-act="goto" data-arg="menu">← ${t('back')}</button><h2>${t('chooseLevel')}</h2></header>
     ${ornament()}
     <label class="toggle"><input type="checkbox" data-act="training" ${training ? 'checked' : ''}/> <span><b>${t('training')}</b><small>${t('trainingHint')}</small></span></label>
     <div class="scroll levels-scroll">
-      ${ch('chapter1', LEVELS.filter((l) => l.id <= 5))}
-      ${ch('chapter2', LEVELS.filter((l) => l.id >= 6))}
+      ${ch(
+        'chapter1',
+        LEVELS.filter((l) => l.id <= 5),
+      )}
+      ${ch(
+        'chapter2',
+        LEVELS.filter((l) => l.id >= 6),
+      )}
       ${s.pro ? ch('chapter3', PRO_LEVELS) : ''}
     </div>
   </section>`;
@@ -182,7 +191,8 @@ function versusScreen(): string {
 }
 
 function duelScreen(): string {
-  const b = (lvl: BotLevel, key: Key) => `<button class="btn ${lvl === 'hard' ? 'primary' : ''}" data-act="startDuel" data-arg="${lvl}">🤖 ${t(key)}</button>`;
+  const b = (lvl: BotLevel, key: Key) =>
+    `<button class="btn ${lvl === 'hard' ? 'primary' : ''}" data-act="startDuel" data-arg="${lvl}">🤖 ${t(key)}</button>`;
   return `
   <section class="screen">
     <header class="bar"><button class="btn sec sm" data-act="goto" data-arg="modes">← ${t('back')}</button><h2>${t('duel')}</h2></header>
@@ -257,11 +267,12 @@ function mineScreen(): string {
 }
 
 function challengeScreen(): string {
+  if (linkLoading)
+    return `<section class="screen"><header class="bar"><h2>${t('challengeTitle')}</h2></header>${ornament()}<div class="panel"><p>${t('cloudConnecting')}</p></div></section>`;
   const l = pendingLink;
   if (!l) return menuScreen();
   const friend = l.name ?? t('friend');
-  const line =
-    l.score !== undefined ? t('challengeFrom', { name: u(friend), score: l.score }) : t('challengeNoScore', { name: u(friend) });
+  const line = l.score !== undefined ? t('challengeFrom', { name: u(friend), score: l.score }) : t('challengeNoScore', { name: u(friend) });
   let title = '';
   if (l.kind === 'c') {
     const d = decodeChallenge(l.code);
@@ -275,12 +286,27 @@ function challengeScreen(): string {
     <div class="panel result">
       <h2>${title}</h2>
       <p class="total">${line}</p>
+      ${pendingShort ? `<p class="small">${t('playsN', { n: pendingShort.plays })}</p>` : ''}
       <button class="btn primary big" data-act="challengePlay">${t('play')}</button>
+      ${pendingShort && cloud.signedIn ? `<h3>${t('whoPlayed')}</h3>${boardTable(pendingShort.rows)}` : ''}
     </div>
   </section>`;
 }
 
-const svgField = `<svg viewBox="0 0 120 150" class="illus" role="img" aria-hidden="true"><rect width="120" height="150" rx="8" fill="#c8975a"/><circle cx="60" cy="52" r="38" fill="rgba(122,70,28,.25)" stroke="#0e7f7d" stroke-width="3"/>${[[42, 46], [60, 46], [78, 46], [50, 62], [70, 62]].map(([x, y]) => `<polygon points="${x - 8},${y} ${x - 4},${y - 4} ${x + 4},${y - 4} ${x + 8},${y} ${x + 4},${y + 4} ${x - 4},${y + 4}" fill="#f6ecd0" stroke="#4b3018" stroke-width="1.2"/>`).join('')}<line x1="8" y1="128" x2="112" y2="128" stroke="#16a5a3" stroke-width="2" stroke-dasharray="5 4"/><polygon points="46,126 52,118 68,118 74,126 68,134 52,134" fill="#aab4bf" stroke="#11171c" stroke-width="1.6"/></svg>`;
+const svgField = `<svg viewBox="0 0 120 150" class="illus" role="img" aria-hidden="true"><rect width="120" height="150" rx="8" fill="#c8975a"/><circle cx="60" cy="52" r="38" fill="rgba(122,70,28,.25)" stroke="#0e7f7d" stroke-width="3"/>${[
+  [42, 46],
+  [60, 46],
+  [78, 46],
+  [50, 62],
+  [70, 62],
+]
+  .map(
+    ([x, y]) =>
+      `<polygon points="${x - 8},${y} ${x - 4},${y - 4} ${x + 4},${y - 4} ${x + 8},${y} ${x + 4},${y + 4} ${x - 4},${y + 4}" fill="#f6ecd0" stroke="#4b3018" stroke-width="1.2"/>`,
+  )
+  .join(
+    '',
+  )}<line x1="8" y1="128" x2="112" y2="128" stroke="#16a5a3" stroke-width="2" stroke-dasharray="5 4"/><polygon points="46,126 52,118 68,118 74,126 68,134 52,134" fill="#aab4bf" stroke="#11171c" stroke-width="1.6"/></svg>`;
 const svgPull = `<svg viewBox="0 0 120 150" class="illus" role="img" aria-hidden="true"><rect width="120" height="150" rx="8" fill="#c8975a"/><polygon points="46,86 52,78 68,78 74,86 68,94 52,94" fill="#aab4bf" stroke="#11171c" stroke-width="1.6"/><line x1="60" y1="70" x2="60" y2="24" stroke="#e5482f" stroke-width="4" stroke-dasharray="8 6"/><polygon points="60,12 50,28 70,28" fill="#e5482f"/><circle cx="60" cy="126" r="9" fill="#f6ecd0" stroke="#4b3018" stroke-width="2"/><line x1="60" y1="94" x2="60" y2="117" stroke="#f6ecd0" stroke-width="3"/></svg>`;
 const svgOut = `<svg viewBox="0 0 120 150" class="illus" role="img" aria-hidden="true"><rect width="120" height="150" rx="8" fill="#c8975a"/><circle cx="60" cy="80" r="42" fill="rgba(122,70,28,.25)" stroke="#0e7f7d" stroke-width="3"/><polygon points="52,78 57,73 67,73 72,78 67,83 57,83" fill="#f6ecd0" stroke="#4b3018" stroke-width="1.4"/><polygon points="88,28 93,23 103,23 108,28 103,33 93,33" fill="#f6ecd0" stroke="#4b3018" stroke-width="1.4" opacity=".6"/><circle cx="98" cy="28" r="2.6" fill="#e5482f"/><path d="M66 74 L92 34" stroke="#e5482f" stroke-width="2.4" stroke-dasharray="4 4" fill="none"/></svg>`;
 const svgTypes = `<svg viewBox="0 0 120 150" class="illus" role="img" aria-hidden="true"><rect width="120" height="150" rx="8" fill="#c8975a"/><polygon points="22,40 30,32 48,32 56,40 48,48 30,48" fill="#f0c53a" stroke="#5a3d0a" stroke-width="1.6"/><text x="82" y="46" font-size="18" font-weight="700" fill="#2b1a0e">30</text><polygon points="22,80 30,72 48,72 56,80 48,88 30,88" fill="#7c766c" stroke="#1a1612" stroke-width="1.6"/><rect x="28" y="77" width="22" height="6" fill="#d6d1c8"/><text x="82" y="86" font-size="18" font-weight="700" fill="#2b1a0e">15</text><rect x="25" y="106" width="28" height="28" rx="6" fill="#8a8074" stroke="#231d17" stroke-width="1.6"/><text x="82" y="126" font-size="18" font-weight="700" fill="#2b1a0e">0</text></svg>`;
@@ -327,6 +353,8 @@ function settingsScreen(): string {
       <div class="chips">${opt('quality', 'auto', t('qualityAuto'), q === 'auto')}${opt('quality', 'high', t('qualityHigh'), q === 'high')}${opt('quality', 'low', t('qualityLow'), q === 'low')}</div>
       <p class="small">${t('qualityHint')}</p>
       <label class="field"><span>${t('yourName')}</span><input data-name="0" maxlength="16" placeholder="${t('yourNamePh')}" autocomplete="off"/></label>
+      ${FEATURES.cloud ? `<button class="btn sec" data-act="goto" data-arg="profile">👤 ${t('profile')}</button>` : ''}
+      ${aboutBlock()}
     </div>
   </section>`;
 }
@@ -463,7 +491,8 @@ function resultModal(r: ResultData): string {
     if (s.mode === 'daily') extra.push(`<button class="btn" data-act="shareDaily">${t('challengeFriend')}</button>`);
     if (s.mode === 'custom' && r.challenge?.code) {
       extra.push(`<button class="btn" data-act="counter">${t('counterChallenge')}</button>`);
-      if (!store.data.customLevels.some((c) => c.code === r.challenge?.code)) extra.push(`<button class="btn sec" data-act="saveMine">${t('saveToMine')}</button>`);
+      if (!store.data.customLevels.some((c) => c.code === r.challenge?.code))
+        extra.push(`<button class="btn sec" data-act="saveMine">${t('saveToMine')}</button>`);
     }
     extra.push(`<button class="btn sec" data-act="card">${t('card')}</button>`);
     buttons = `
@@ -474,7 +503,10 @@ function resultModal(r: ResultData): string {
   const diffPick =
     s.mode === 'campaign' && r.levelId === 0 && win
       ? `<div class="diffpick"><small>${t('difficulty')}</small><div class="chips">${(['normal', 'easy'] as Difficulty[])
-          .map((d) => `<button class="chip wide${store.data.difficulty === d ? ' on' : ''}" data-act="difficulty" data-arg="${d}">${t(d === 'easy' ? 'diffEasy' : 'diffNormal')}</button>`)
+          .map(
+            (d) =>
+              `<button class="chip wide${store.data.difficulty === d ? ' on' : ''}" data-act="difficulty" data-arg="${d}">${t(d === 'easy' ? 'diffEasy' : 'diffNormal')}</button>`,
+          )
           .join('')}</div></div>`
       : '';
   return `<div class="modal"><div class="panel pop result ${win ? 'win' : 'lose'}">
@@ -488,8 +520,28 @@ function resultModal(r: ResultData): string {
     ${best}
     ${friendCompare(r, s.score)}
     ${coinsLine(r)}
+    ${saveProgressHint(r)}
     ${diffPick}
     <div class="stack">${buttons}</div></div></div>`;
+}
+
+/** Гостю (или игроку без аккаунта) после победы предлагаем сохранить прогресс в облаке. */
+function saveProgressHint(r: ResultData): string {
+  if (!FEATURES.cloud || !cloud.ready || !r.summary.cleared || r.editorTest) return '';
+  if (cloud.user && !cloud.user.anonymous) return '';
+  return `<button class="btn sec" data-act="toProfile">☁ ${t('saveProgress')}</button>`;
+}
+
+/** Результат → облачный рейтинг (через очередь; без сети отправится позже). Локальные рекорды — как раньше. */
+function submitToCloud(r: ResultData): void {
+  if (!FEATURES.cloud || !cloud.signedIn || r.editorTest) return;
+  const s = r.summary;
+  const base = { kind: 'result' as const, stars: s.stars, throws: s.throwsUsed, combo: s.bestCombo };
+  if (s.mode === 'campaign') cloud.submitResult({ ...base, mode: 'level', key: `level:${r.levelId}`, score: s.score });
+  else if (s.mode === 'daily') cloud.submitResult({ ...base, mode: 'daily', key: `daily:${r.dailyKey ?? dateKey()}`, score: s.score });
+  else if (s.mode === 'endless' && r.endless) cloud.submitResult({ ...base, mode: 'endless', key: 'endless', score: r.endless.total });
+  else if (s.mode === 'custom' && r.challenge?.shortId)
+    cloud.submitResult({ ...base, mode: 'challenge', key: `challenge:${r.challenge.shortId}`, score: s.score });
 }
 
 function friendCompare(r: ResultData, my: number): string {
@@ -532,6 +584,8 @@ function renderScreen(): void {
     mine: mineScreen,
     shop: () => shopScreen(shopOverlay),
     challenge: challengeScreen,
+    profile: profileScreen,
+    board: leaderboardScreen,
   };
   const keepScroll = el.querySelector('.scroll')?.scrollTop ?? 0;
   setHtml(el, map[screen]());
@@ -540,6 +594,7 @@ function renderScreen(): void {
   const sc = el.querySelector('.scroll');
   if (sc) sc.scrollTop = keepScroll;
   if (screen === 'editor') ed.mountEditor(el, () => renderScreen());
+  if (screen === 'profile') bindProfile(el);
 }
 
 function renderHud(): void {
@@ -659,6 +714,11 @@ function saveDraftToMine(): boolean {
 
 function handleLink(link: LinkKind | null): void {
   if (!link) return;
+  pendingShort = null;
+  if (link.kind === 'k') {
+    void openShort(link.id, link.score, link.name);
+    return;
+  }
   if (link.kind === 'c' && !decodeChallenge(link.code).ok) {
     toast(t('badLink'), 3500);
     gotoScreen('menu');
@@ -669,20 +729,64 @@ function handleLink(link: LinkKind | null): void {
   gotoScreen('challenge');
 }
 
+/** Короткая ссылка #k=: вызов читается из облака (доступно и без входа). */
+async function openShort(id: string, score?: number, name?: string): Promise<void> {
+  if (gstate !== 'MENU') bus.emit('toMenu', undefined);
+  linkLoading = true;
+  gotoScreen('challenge');
+  const ch = await cloud.getShort(id);
+  linkLoading = false;
+  if (!ch || !decodeChallenge(ch.code).ok) {
+    toast(t(cloud.ready ? 'badLink' : 'cloudOff'), 3500);
+    gotoScreen('menu');
+    return;
+  }
+  pendingLink = { kind: 'c', code: ch.code, score, name };
+  pendingShort = { id: ch.id, plays: ch.plays, rows: cloud.signedIn ? 'loading' : null };
+  gotoScreen('challenge');
+  if (cloud.signedIn) {
+    const rows = await cloud.leaderboard('challenge', `challenge:${ch.id}`);
+    if (pendingShort?.id === ch.id) {
+      pendingShort.rows = rows ?? 'error';
+      if (screen === 'challenge') renderScreen();
+    }
+  }
+}
+
+/** Ссылка на своё испытание: короткая через облако, иначе полная с кодом (обе формы работают всегда). */
+async function challengeLink(code: string, title: string, score?: number): Promise<string> {
+  const d = decodeChallenge(code);
+  if (cloud.ready && d.ok) {
+    const id = await cloud.createShort(code, title, d.challenge.throws, d.challenge.par);
+    if (id) return makeLink({ kind: 'k', id, score, name: senderName() });
+  }
+  return makeLink({ kind: 'c', code, score, name: senderName() });
+}
+
 function playPendingLink(): void {
   const l = pendingLink;
   if (!l) return;
   const base = { challengeScore: l.score, challengeName: l.name ?? t('friend') };
-  if (l.kind === 'c') start({ mode: 'custom', levelId: 300, code: l.code, ...base });
-  else if (l.kind === 'd') start({ mode: 'daily', levelId: 200, dailyKey: l.date, ...base });
-  else start({ mode: 'endless', levelId: 400, runSeed: l.seed, ...base });
+  if (l.kind === 'c') {
+    const shortId = pendingShort?.id;
+    if (shortId) cloud.played(shortId);
+    start({ mode: 'custom', levelId: 300, code: l.code, shortId, ...base });
+  } else if (l.kind === 'd') start({ mode: 'daily', levelId: 200, dailyKey: l.date, ...base });
+  else if (l.kind === 'e') start({ mode: 'endless', levelId: 400, runSeed: l.seed, ...base });
   pendingLink = null;
+  pendingShort = null;
 }
 
 function cardFor(r: ResultData): void {
   const s = r.summary;
   const title =
-    s.mode === 'custom' ? r.name || t('custom') : s.mode === 'endless' ? t('waveReached', { n: r.endless?.wave ?? 1 }) : s.mode === 'daily' ? `${t('dailyTitle')} ${r.dailyKey ?? ''}` : levelName(r.levelId);
+    s.mode === 'custom'
+      ? r.name || t('custom')
+      : s.mode === 'endless'
+        ? t('waveReached', { n: r.endless?.wave ?? 1 })
+        : s.mode === 'daily'
+          ? `${t('dailyTitle')} ${r.dailyKey ?? ''}`
+          : levelName(r.levelId);
   const fs = r.challenge?.friendScore;
   void shareCard({
     title,
@@ -695,6 +799,7 @@ function cardFor(r: ResultData): void {
 
 function handleAction(act: string, arg: string | undefined, el: HTMLElement): void {
   sfx.unlock();
+  if (handleCloudAction(act, arg, $('screen'), renderScreen)) return;
   const disabled = el.getAttribute('aria-disabled') === 'true';
   switch (act) {
     case 'continue':
@@ -713,11 +818,13 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
       sfx.click();
       if (arg === 'records') recordsTab = 'levels';
       gotoScreen(arg as Screen);
+      if (arg === 'board') void loadBoard(renderScreen);
       break;
     case 'rtab':
       recordsTab = arg as RecordsTab;
       confirmReset = false;
       renderAll();
+      if (recordsTab === 'history') void loadCloudHistory(renderScreen);
       break;
     case 'level':
       sfx.click();
@@ -883,7 +990,7 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
         break;
       }
       saveDraftToMine();
-      void shareUrl(makeLink({ kind: 'c', code: ed.currentCode(), name: senderName() }));
+      void challengeLink(ed.currentCode(), ed.toChallenge().name).then(shareUrl);
       renderScreen();
       break;
     case 'backToEditor':
@@ -910,7 +1017,7 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
         toast(t('shareLocked'));
         break;
       }
-      void shareUrl(makeLink({ kind: 'c', code: c.code, name: senderName() }));
+      void challengeLink(c.code, c.name).then(shareUrl);
       break;
     }
     case 'mineDel':
@@ -936,7 +1043,14 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
       gotoScreen('menu');
       break;
     case 'counter':
-      if (result?.challenge?.code) void shareUrl(makeLink({ kind: 'c', code: result.challenge.code, score: result.summary.score, name: senderName() }));
+      if (result?.challenge?.code) {
+        const r = result;
+        const code = r.challenge!.code!;
+        const link = r.challenge?.shortId
+          ? Promise.resolve(makeLink({ kind: 'k', id: r.challenge.shortId, score: r.summary.score, name: senderName() }))
+          : challengeLink(code, r.name ?? '', r.summary.score);
+        void link.then(shareUrl);
+      }
       break;
     case 'saveMine': {
       const code = result?.challenge?.code;
@@ -961,10 +1075,17 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
       break;
     }
     case 'shareEndless':
-      if (result?.endless) void shareUrl(makeLink({ kind: 'e', seed: result.endless.runSeed, score: result.endless.total, name: senderName() }));
+      if (result?.endless)
+        void shareUrl(makeLink({ kind: 'e', seed: result.endless.runSeed, score: result.endless.total, name: senderName() }));
       break;
     case 'card':
       if (result) cardFor(result);
+      break;
+    case 'toProfile':
+      store.update((s) => (s.resume = null));
+      result = null;
+      screen = 'profile';
+      bus.emit('toMenu', undefined);
       break;
 
     // ---- магазин
@@ -1086,6 +1207,7 @@ export function initUI(): void {
   });
   bus.on('result', (r) => {
     result = r;
+    submitToCloud(r);
     if (r.editorTest && r.summary.cleared) {
       ed.markVerified();
       if (ed.draft.id) {
@@ -1120,6 +1242,12 @@ export function initUI(): void {
   });
 
   onLang(renderAll);
+  cloud.onChange(() => {
+    if (gstate === 'MENU') {
+      bus.emit('look', undefined); // облачное сохранение могло сменить оформление
+      renderScreen();
+    }
+  });
   // Не даём странице скроллиться/зумиться при игре пальцем (кроме прокручиваемых панелей).
   document.addEventListener(
     'touchmove',

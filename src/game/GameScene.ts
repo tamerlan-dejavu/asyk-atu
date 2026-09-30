@@ -4,6 +4,7 @@ import { sfx } from '../audio/sfx';
 import { decodeChallenge, challengeToLevel } from '../challenge/codec';
 import { applyLevelResult, store } from '../storage/save';
 import { HAPTIC, vibrate } from '../util/haptics';
+import { debugStats } from '../util/observability';
 import type { AsykType, BotLevel, GameMode, LevelDef, ResultEntry, ResumeState } from '../types';
 import {
   AIM_ZONE_Y,
@@ -156,7 +157,14 @@ export class GameScene extends Phaser.Scene {
 
     this.aimGfx = this.add.graphics().setDepth(D_AIM);
     this.powerText = this.add
-      .text(0, 0, '', { fontFamily: 'system-ui, Segoe UI, Roboto, sans-serif', fontSize: '30px', fontStyle: 'bold', color: '#ffffff', stroke: '#2b1a0e', strokeThickness: 6 })
+      .text(0, 0, '', {
+        fontFamily: 'system-ui, Segoe UI, Roboto, sans-serif',
+        fontSize: '30px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        stroke: '#2b1a0e',
+        strokeThickness: 6,
+      })
       .setOrigin(0.5)
       .setDepth(D_TEXT)
       .setResolution(S)
@@ -223,7 +231,10 @@ export class GameScene extends Phaser.Scene {
     const shKey = isSaka ? 'shadowSaka' : isBlock ? 'shadowBlock' : 'shadowAsyk';
     const shadow = this.add.image(0, 0, shKey).setDepth(D_SHADOW);
     const contact = this.add.image(0, 0, shKey).setDepth(D_SHADOW);
-    const body = this.add.image(0, 0, isSaka ? 'saka' : BODY_TEX[type]).setDepth(D_BODY).setDisplaySize(tex.w, tex.h);
+    const body = this.add
+      .image(0, 0, isSaka ? 'saka' : BODY_TEX[type])
+      .setDepth(D_BODY)
+      .setDisplaySize(tex.w, tex.h);
     const hl = this.add.image(0, 0, isSaka ? 'hlSaka' : 'hlAsyk').setDepth(D_HL);
     hl.setDisplaySize(isSaka ? 30 : 20, isSaka ? 20 : 13);
     return { shadow, contact, body, hl, kind, type };
@@ -264,9 +275,18 @@ export class GameScene extends Phaser.Scene {
     const base = isSaka ? SAKA : isBlock ? { w: BLOCK.size, h: BLOCK.size } : ASYK;
     const zz = flags.bounce && !isBlock ? z : 0;
     const scale = (1 + zz * 0.004) * scaleMul;
-    s.body.setVisible(true).setPosition(x, y - zz).setRotation(angle).setDisplaySize(tex.w * scale, tex.h * scale).setAlpha(alpha);
+    s.body
+      .setVisible(true)
+      .setPosition(x, y - zz)
+      .setRotation(angle)
+      .setDisplaySize(tex.w * scale, tex.h * scale)
+      .setAlpha(alpha);
     if (isBlock) s.hl.setVisible(false);
-    else s.hl.setVisible(true).setPosition(x + HL_OFFSET.x * scale, y - zz + HL_OFFSET.y * scale).setAlpha(alpha * 0.9 * hlMul);
+    else
+      s.hl
+        .setVisible(true)
+        .setPosition(x + HL_OFFSET.x * scale, y - zz + HL_OFFSET.y * scale)
+        .setAlpha(alpha * 0.9 * hlMul);
     // Тень: смещение задаётся направлением света, а не углом тела; растёт и светлеет с z.
     const off = SHADOW_OFFSET + zz * 0.9;
     if (flags.soft) {
@@ -409,7 +429,7 @@ export class GameScene extends Phaser.Scene {
 
   private setupRound(level: LevelDef, mode: GameMode, resume?: ResumeState): void {
     this.level = level;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const M = (Phaser.Physics.Matter as any).Matter;
     const sim = new Sim(M, level.zone);
     this.sim = sim;
@@ -545,7 +565,7 @@ export class GameScene extends Phaser.Scene {
       .asyks()
       .filter((b) => !b.scored)
       .map((b) => ({ x: b.body.position.x, y: b.body.position.y, angle: b.body.angle, type: b.type }));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const M = (Phaser.Physics.Matter as any).Matter;
     const { shot } = await chooseShot(M, level.zone, specs, this.ctx.botLevel, this.botRnd, { deadlineMs: 800 });
     if (token !== this.botToken || !this.round) return;
@@ -561,7 +581,19 @@ export class GameScene extends Phaser.Scene {
       const u = Math.min(1, b.t / b.dur);
       const eased = 1 - Math.pow(1 - u, 2);
       const power = b.shot.power * eased;
-      return { active: true, mode: 'keys', ax: 0, ay: 0, cx: 0, cy: 0, pull: 24 + power * 146, power, dirX: b.shot.dirX, dirY: b.shot.dirY, valid: true };
+      return {
+        active: true,
+        mode: 'keys',
+        ax: 0,
+        ay: 0,
+        cx: 0,
+        cy: 0,
+        pull: 24 + power * 146,
+        power,
+        dirX: b.shot.dirX,
+        dirY: b.shot.dirY,
+        valid: true,
+      };
     }
     return this.aim.state;
   }
@@ -600,6 +632,7 @@ export class GameScene extends Phaser.Scene {
     this.sprites.set('saka', this.makeSprites('saka', 'normal'));
     this.hideSprites(this.idle);
     r.beginThrow();
+    debugStats.throws++;
     this.firstThrow = true;
     this.pendingOut = [];
     this.sakaHitAsyk = false;
@@ -685,7 +718,11 @@ export class GameScene extends Phaser.Scene {
     this.acc += dt;
     let n = 0;
     while (this.acc >= STEP_MS && n < 4) {
-      this.processStep(sim.step());
+      const t0 = performance.now();
+      const res = sim.step();
+      debugStats.simMs += performance.now() - t0;
+      debugStats.steps++;
+      this.processStep(res);
       this.acc -= STEP_MS;
       n++;
       if (sim.settled) break;
@@ -913,12 +950,13 @@ export class GameScene extends Phaser.Scene {
         bestStars,
         hasNext: nextId !== undefined,
         dailyBest,
+        dailyKey: mode === 'daily' ? this.ctx.dailyKey : undefined,
         endless,
         editorTest: this.req.editorTest,
         botLevel: mode === 'duel' ? this.ctx.botLevel : undefined,
         challenge:
           mode === 'custom'
-            ? { code: this.req.code, friendName: this.req.challengeName, friendScore: this.req.challengeScore }
+            ? { code: this.req.code, shortId: this.req.shortId, friendName: this.req.challengeName, friendScore: this.req.challengeScore }
             : this.req.challengeScore !== undefined
               ? { friendName: this.req.challengeName, friendScore: this.req.challengeScore }
               : undefined,
@@ -1052,7 +1090,11 @@ export class GameScene extends Phaser.Scene {
       g.arc(p0.x, p0.y, R, Phaser.Math.DegToRad(-90), Phaser.Math.DegToRad(-90 + 360 * Math.max(0.02, power)), false);
       g.strokePath();
     }
-    this.powerText.setVisible(a.valid || a.mode === 'keys').setPosition(p0.x, p0.y + 84).setText(`${Math.round(power * 100)}%`).setColor('#ffffff');
+    this.powerText
+      .setVisible(a.valid || a.mode === 'keys')
+      .setPosition(p0.x, p0.y + 84)
+      .setText(`${Math.round(power * 100)}%`)
+      .setColor('#ffffff');
 
     if (a.valid || a.mode === 'keys') {
       // «Лёгкий» режим: длинная направляющая с грубой дальностью (v / frictionAir)

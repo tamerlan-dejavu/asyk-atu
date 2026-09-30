@@ -4,7 +4,8 @@ import { cleanName, MAX_CODE_LENGTH } from './codec';
 export type LinkKind =
   | { kind: 'c'; code: string; score?: number; name?: string }
   | { kind: 'd'; date: string; score?: number; name?: string }
-  | { kind: 'e'; seed: number; score?: number; name?: string; wave?: number };
+  | { kind: 'e'; seed: number; score?: number; name?: string; wave?: number }
+  | { kind: 'k'; id: string; score?: number; name?: string };
 
 const MAX_SCORE = 99999;
 
@@ -28,6 +29,8 @@ export function parseHash(hash: string): LinkKind | null {
     const p = new URLSearchParams(h);
     const score = parseScore(p.get('s'));
     const name = parseName(p.get('n'));
+    const k = p.get('k');
+    if (k !== null) return /^[A-Za-z0-9]{8}$/.test(k) ? { kind: 'k', id: k, score, name } : null;
     const c = p.get('c');
     if (c !== null) return c.length <= MAX_CODE_LENGTH ? { kind: 'c', code: c, score, name } : null;
     const d = p.get('d');
@@ -45,7 +48,8 @@ export function parseHash(hash: string): LinkKind | null {
 
 export function buildLink(base: string, link: LinkKind): string {
   const p = new URLSearchParams();
-  if (link.kind === 'c') p.set('c', link.code);
+  if (link.kind === 'k') p.set('k', link.id);
+  else if (link.kind === 'c') p.set('c', link.code);
   else if (link.kind === 'd') p.set('d', link.date);
   else {
     p.set('e', String(link.seed));

@@ -63,3 +63,26 @@ export function toast(text: string, ms = 2200): void {
   window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => el.classList.remove('show'), ms);
 }
+
+// ------------------------------------------------------------------ пользовательский текст — только через textContent
+const userTexts = new Map<number, string>();
+let uSeq = 0;
+/** Место для строки пользователя (имя, название): вставляется в DOM через textContent, без разметки. */
+export function u(s: string): string {
+  if (userTexts.size > 400) userTexts.clear();
+  const id = ++uSeq;
+  userTexts.set(id, s);
+  return `<bdi data-u="${id}"></bdi>`;
+}
+export function fillUser(root: ParentNode): void {
+  root.querySelectorAll<HTMLElement>('[data-u]').forEach((el) => {
+    const id = Number(el.dataset.u);
+    el.textContent = userTexts.get(id) ?? '';
+    userTexts.delete(id);
+    el.removeAttribute('data-u');
+  });
+}
+export function setHtml(el: HTMLElement, html: string): void {
+  el.innerHTML = html;
+  fillUser(el);
+}

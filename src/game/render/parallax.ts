@@ -16,7 +16,11 @@ interface Layer {
  */
 export class Parallax {
   private readonly layers: Layer[];
-  private cur = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
+  private cur = [
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+  ];
   enabled = true;
   /** дрейф выключается отдельно (prefers-reduced-motion) */
   drift = true;

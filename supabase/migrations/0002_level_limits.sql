@@ -1,0 +1,23 @@
+-- СГЕНЕРИРОВАНО scripts/gen-level-limits.mjs из src/game/levels — не править вручную.
+-- Верхняя граница правдоподобного счёта для submit_result().
+insert into public.level_limits (mode, key, max_score) values
+  ('level', 'level:0', 40),
+  ('level', 'level:1', 130),
+  ('level', 'level:2', 145),
+  ('level', 'level:3', 185),
+  ('level', 'level:4', 185),
+  ('level', 'level:5', 170),
+  ('level', 'level:6', 150),
+  ('level', 'level:7', 185),
+  ('level', 'level:8', 155),
+  ('level', 'level:9', 230),
+  ('level', 'level:10', 230),
+  ('level', 'level:11', 195),
+  ('level', 'level:12', 215),
+  ('level', 'level:13', 245),
+  ('level', 'level:14', 275),
+  ('level', 'level:15', 320),
+  ('daily', '*', 145),
+  ('challenge', '*', 515),
+  ('endless', '*', 5000)
+on conflict (mode, key) do update set max_score = excluded.max_score;

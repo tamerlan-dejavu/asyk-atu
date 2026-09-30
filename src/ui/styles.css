@@ -28,7 +28,14 @@ body {
   overscroll-behavior: none;
   touch-action: none;
   background: #4a2b14;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
 }
 
 /* Декоративный фон по бокам на десктопе */
@@ -53,7 +60,9 @@ body {
   container-type: inline-size;
   overflow: hidden;
   background: #b8823f;
-  box-shadow: 0 0 0 0.4vmin #2b1a0e, 0 1.5vmin 6vmin rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 0 0 0.4vmin #2b1a0e,
+    0 1.5vmin 6vmin rgba(0, 0, 0, 0.6);
 }
 
 #game {
@@ -117,7 +126,10 @@ input:focus-visible {
   font-weight: 700;
   letter-spacing: 0.01em;
   box-shadow: 0 0.2em 0 var(--ink);
-  transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+  transition:
+    transform 0.08s,
+    box-shadow 0.08s,
+    filter 0.15s;
 }
 .btn:hover {
   filter: brightness(1.08);
@@ -283,7 +295,10 @@ input:focus-visible {
   font-size: 3.4em;
   line-height: 1.05;
   letter-spacing: 0.02em;
-  text-shadow: 0 0.06em 0 var(--terra-d), 0 0.14em 0 var(--ink), 0 0.3em 0.6em rgba(0, 0, 0, 0.5);
+  text-shadow:
+    0 0.06em 0 var(--terra-d),
+    0 0.14em 0 var(--ink),
+    0 0.3em 0.6em rgba(0, 0, 0, 0.5);
   animation: float-y 5s ease-in-out infinite;
 }
 .tag {
@@ -745,7 +760,9 @@ input:focus-visible {
   font-size: 1.6em;
   font-weight: 800;
   color: #fff;
-  text-shadow: 0 0.08em 0 var(--ink), 0 0 0.6em rgba(0, 0, 0, 0.6);
+  text-shadow:
+    0 0.08em 0 var(--ink),
+    0 0 0.6em rgba(0, 0, 0, 0.6);
   opacity: 0;
   transform: scale(0.9);
 }
@@ -758,7 +775,9 @@ input:focus-visible {
   font-weight: 900;
   font-size: 1.5em;
   color: #fff;
-  text-shadow: 0 0.06em 0 var(--ink), 0 0 0.3em rgba(0, 0, 0, 0.6);
+  text-shadow:
+    0 0.06em 0 var(--ink),
+    0 0 0.3em rgba(0, 0, 0, 0.6);
   animation: float-up 0.95s ease-out forwards;
   white-space: nowrap;
 }
@@ -963,7 +982,7 @@ input:focus-visible {
 }
 
 /* ================= v2 ================= */
-.btn[aria-disabled="true"] {
+.btn[aria-disabled='true'] {
   opacity: 0.5;
   filter: grayscale(0.4);
 }
@@ -1423,7 +1442,9 @@ input:focus-visible {
   color: #fff;
   font-weight: 700;
   transform: translateY(-0.4em);
-  transition: opacity 0.25s, transform 0.25s;
+  transition:
+    opacity 0.25s,
+    transform 0.25s;
 }
 #toast {
   top: 20%;
@@ -1446,4 +1467,104 @@ input:focus-visible {
 #ach.show {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* ================= v3: облако ================= */
+.menu-sync {
+  min-height: 1.4em;
+  text-align: center;
+}
+.syncbadge {
+  display: inline-block;
+  padding: 0.15em 0.7em;
+  border-radius: 2em;
+  font-size: 0.8em;
+  font-weight: 700;
+  background: rgba(43, 26, 14, 0.75);
+  color: var(--cream);
+}
+.syncbadge.s-saved {
+  color: #9ff0d2;
+}
+.syncbadge.s-error,
+.syncbadge.s-offline {
+  color: #ffd35a;
+}
+.panel hr {
+  width: 100%;
+  border: 0;
+  border-top: 0.1em dashed rgba(154, 69, 38, 0.4);
+  margin: 0.2em 0;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+}
+.board li {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.4em 0.55em;
+  border-radius: 0.55em;
+  background: #fff8e8;
+  border: 0.08em solid rgba(154, 69, 38, 0.3);
+}
+.board li.me {
+  background: #d6f2ef;
+  border-color: var(--turq);
+  font-weight: 700;
+}
+.board .pl {
+  min-width: 1.8em;
+  font-weight: 800;
+  color: var(--terra-d);
+}
+.board .nk {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board .ver {
+  color: #0b6664;
+}
+.board.skeleton li span {
+  display: block;
+  height: 0.9em;
+  border-radius: 0.3em;
+  background: linear-gradient(90deg, #eadcbc, #f7ecd4, #eadcbc);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+.board.skeleton li span:nth-child(1) {
+  width: 1.6em;
+}
+.board.skeleton li span:nth-child(2) {
+  flex: 1;
+}
+.board.skeleton li span:nth-child(3) {
+  width: 3em;
+}
+.lvpick .chip {
+  min-width: 2.3em;
+  background: var(--terra);
+}
+.lvpick .chip.on {
+  background: var(--turq);
+}
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
 }

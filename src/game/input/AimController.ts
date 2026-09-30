@@ -73,7 +73,12 @@ export class AimController {
 
   private attach(): void {
     const c = this.o.canvas;
-    const on = <K extends keyof HTMLElementEventMap>(el: HTMLElement | Window | Document, ev: string, fn: (e: never) => void, opts?: AddEventListenerOptions) => {
+    const on = <K extends keyof HTMLElementEventMap>(
+      el: HTMLElement | Window | Document,
+      ev: string,
+      fn: (e: never) => void,
+      opts?: AddEventListenerOptions,
+    ) => {
       el.addEventListener(ev, fn as EventListener, opts);
       this.cleanup.push(() => el.removeEventListener(ev, fn as EventListener, opts));
       return undefined as unknown as K;

@@ -1,0 +1,53 @@
+name: Uptime
+
+# Раз в 6 часов: игра доступна и отдаёт свою страницу; облако (если настроено) отвечает.
+# Этот же запрос держит бесплатный проект Supabase «бодрым» (иначе он засыпает после недели без активности).
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - name: Check game page
+        id: site
+        run: |
+          if [ -z "$SITE_URL" ]; then echo "SITE_URL не задан (Settings → Variables) — пропуск"; exit 0; fi
+          body=$(curl -fsSL --max-time 20 "$SITE_URL") || { echo "site down"; exit 1; }
+          echo "$body" | grep -q 'id="game"' || { echo "no game marker"; exit 1; }
+          echo "site ok"
+
+      - name: Check Supabase (keep-alive)
+        id: cloud
+        if: env.SUPABASE_URL != ''
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/level_limits?select=mode&limit=1")
+          echo "supabase http $code"
+          [ "$code" = "200" ]
+
+      - name: Open issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Uptime check failed';
+            const open = await github.rest.issues.listForRepo({ owner: context.repo.owner, repo: context.repo.repo, state: 'open' });
+            if (open.data.some((i) => i.title === title)) return; // не плодим дубли
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body: `Плановая проверка не прошла: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nСм. docs/RUNBOOK.md → «Supabase недоступен или уснул».`,
+            });

@@ -53,7 +53,9 @@ describe('достижения', () => {
   it('дуэлянт — только победа над сильным ботом', () => {
     const s = defaultSave();
     expect(processEvent(s, { type: 'levelEnd', mode: 'duel', cleared: true, throwsLeft: 0, botHardWon: false }).unlocked).toEqual([]);
-    expect(processEvent(s, { type: 'levelEnd', mode: 'duel', cleared: true, throwsLeft: 0, botHardWon: true }).unlocked).toEqual(['duelist']);
+    expect(processEvent(s, { type: 'levelEnd', mode: 'duel', cleared: true, throwsLeft: 0, botHardWon: true }).unlocked).toEqual([
+      'duelist',
+    ]);
   });
 
   it('марафонец на волне 5, дизайнер при «поделиться»', () => {

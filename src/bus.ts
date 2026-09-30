@@ -9,6 +9,8 @@ export interface StartRequest {
   levelId: number;
   /** код своего испытания / вызова друга (mode custom) */
   code?: string;
+  /** короткий id вызова из облака (#k=…) */
+  shortId?: string;
   /** режим custom запущен из редактора («Проверить») */
   editorTest?: boolean;
   /** результат друга, который нужно побить */
@@ -59,7 +61,7 @@ export interface ResultData {
   /** бесконечный режим */
   endless?: { wave: number; total: number; best: number; newBest: boolean; runSeed: number };
   /** вызов друга / свои испытания */
-  challenge?: { code?: string; friendName?: string; friendScore?: number };
+  challenge?: { code?: string; shortId?: string; friendName?: string; friendScore?: number };
   editorTest?: boolean;
   botLevel?: BotLevel;
   /** сколько тиын получено за раунд (включая достижения) */

@@ -27,11 +27,11 @@ export const kk: Dict = {
   level8: 'Тас қалқан', // verify: native speaker
   level9: 'Аралас шеңбер', // verify: native speaker
   level10: 'Дала финалы', // verify: native speaker
-  level11: "Алтын шашу", // verify: native speaker
-  level12: "Темір қатар", // verify: native speaker
-  level13: "Тастар арасындағы жол", // verify: native speaker
-  level14: "Үлкен той", // verify: native speaker
-  level15: "Хан алтыны", // verify: native speaker
+  level11: 'Алтын шашу', // verify: native speaker
+  level12: 'Темір қатар', // verify: native speaker
+  level13: 'Тастар арасындағы жол', // verify: native speaker
+  level14: 'Үлкен той', // verify: native speaker
+  level15: 'Хан алтыны', // verify: native speaker
   levelN: '{n}-сынақ', // verify: native speaker
   best: 'Рекорд', // verify: native speaker
   locked: 'Жабық', // verify: native speaker
@@ -100,7 +100,8 @@ export const kk: Dict = {
   rulesOut: '«Шықты» дегеніміз не', // verify: native speaker
   rulesOutText: 'Асықтың центрі қоннан шықса, ол шығарылған болып саналады. Бір рет және мәңгі.', // verify: native speaker
   rulesScore: 'Ұпай', // verify: native speaker
-  rulesScoreText: 'Әр асыққа 10 және бір лақтырудағы әрбір келесіге +5: 1 → 10, 2 → 25, 3 → 40. Бонус: қон таза болса, әр қолданылмаған әрекетке +10.', // verify: native speaker
+  rulesScoreText:
+    'Әр асыққа 10 және бір лақтырудағы әрбір келесіге +5: 1 → 10, 2 → 25, 3 → 40. Бонус: қон таза болса, әр қолданылмаған әрекетке +10.', // verify: native speaker
   rulesStars: 'Жұлдыздар', // verify: native speaker
   rulesStarsText: '3★ — par лақтыруда немесе тезірек, 2★ — par + 1, 1★ — кез келген қолжетімді лақтыруда.', // verify: native speaker
   rulesVersus: 'Екеуміз', // verify: native speaker
@@ -127,6 +128,58 @@ export const kk: Dict = {
   qualityHint: 'Төмен сапа параллаксты, секіруді және жұмсақ көлеңкені өшіреді', // verify: native speaker
   mute: 'Дыбыс', // verify: native speaker
   rotate: 'Құрылғыны тігінен бұр', // verify: native speaker
+  profile: 'Профиль', // verify: native speaker
+  profileTitle: 'Профиль және бұлт', // verify: native speaker
+  cloudOff: 'Бұлт қолжетімсіз — ойын мен прогресс жергілікті жұмыс істейді', // verify: native speaker
+  cloudConnecting: 'Бұлтқа қосылудамыз…', // verify: native speaker
+  cloudIntro:
+    'Бұлт прогресті, рекордтарды және сынақтарды сақтайды — оларды басқа құрылғыдан ашуға болады. Кірмесең де ойын бұрынғыдай жұмыс істейді.', // verify: native speaker
+  guestLogin: 'Қонақ ретінде кіру', // verify: native speaker
+  guestHint: 'Бір рет басу: поштасыз және құпиясөзсіз бұлт профилі', // verify: native speaker
+  saveProgress: 'Прогресті сақтау', // verify: native speaker
+  saveProgressHint: 'Пошта мен құпиясөз көрсет — кез келген құрылғыдан кіресің, қонақ деректері сақталады', // verify: native speaker
+  email: 'Пошта', // verify: native speaker
+  password: 'Құпиясөз (6 таңбадан)', // verify: native speaker
+  register: 'Аккаунт құру', // verify: native speaker
+  login: 'Кіру', // verify: native speaker
+  haveAccount: 'Аккаунтың бар ма? Кіру', // verify: native speaker
+  noAccount: 'Аккаунтың жоқ па? Құру', // verify: native speaker
+  logout: 'Шығу', // verify: native speaker
+  nickname: 'Лақап ат', // verify: native speaker
+  nickSave: 'Лақап атты сақтау', // verify: native speaker
+  nickSaved: 'Лақап ат сақталды', // verify: native speaker
+  errNickInvalid: 'Лақап ат: 3–16 әріп, сан, бос орын, _ . -', // verify: native speaker
+  errTaken: 'Бұл лақап ат бос емес', // verify: native speaker
+  errWeak: 'Құпиясөз тым қысқа', // verify: native speaker
+  errExists: 'Бұл пошта тіркелген — кір', // verify: native speaker
+  errCredentials: 'Пошта немесе құпиясөз қате', // verify: native speaker
+  errNetwork: 'Бұлтпен байланыс жоқ. Кейінірек байқап көр', // verify: native speaker
+  errLimit: 'Тым көп әрекет. Біраз күт', // verify: native speaker
+  errInvalid: 'Болмады. Деректерді тексер', // verify: native speaker
+  deleteAccount: 'Аккаунт пен деректерді жою', // verify: native speaker
+  deleteConfirm: 'Аккаунтты, бұлттағы сақтауларды, нәтижелер мен сынақтарды жою керек пе? Осы құрылғыдағы прогресс қалады.', // verify: native speaker
+  deleted: 'Аккаунт жойылды', // verify: native speaker
+  signedInAs: 'Кірдің: {name}', // verify: native speaker
+  guestAccount: 'қонақ аккаунты', // verify: native speaker
+  syncSaved: 'Бұлтта сақталды', // verify: native speaker
+  syncSaving: 'Сақтап жатырмыз…', // verify: native speaker
+  syncOffline: 'Желіде емес', // verify: native speaker
+  syncError: 'Синхрондау қатесі', // verify: native speaker
+  leaderboard: 'Рейтинг', // verify: native speaker
+  modeBoardDesc: 'Үздік ойыншылар: бүгін, шексіз, деңгейлер', // verify: native speaker
+  lbToday: 'Бүгін', // verify: native speaker
+  lbEndless: 'Шексіз', // verify: native speaker
+  lbLevels: 'Деңгейлер', // verify: native speaker
+  lbEmpty: 'Әзірге ешкім ойнамады — бірінші бол!', // verify: native speaker
+  lbLoginHint: 'Рейтингті көру үшін кір (қонақ ретінде де болады)', // verify: native speaker
+  lbVerified: 'тексерілген', // verify: native speaker
+  lbYou: 'сен', // verify: native speaker
+  about: 'Қосымша туралы', // verify: native speaker
+  buildInfo: 'Құрастыру {sha} · {time}', // verify: native speaker
+  whoPlayed: 'Кім өтті', // verify: native speaker
+  playsN: 'Ойналды: {n}', // verify: native speaker
+  cloudHistory: 'Бұлттан (соңғы 50)', // verify: native speaker
+  shortLinkOff: 'Бұлт қолжетімсіз — толық сілтеме жіберілді', // verify: native speaker
   quitConfirm: 'Раундтан шығасың ба? Оның прогресі сақталмайды.', // verify: native speaker
   yourName: 'Атың (сілтеме үшін)', // verify: native speaker
   yourNamePh: 'Мысалы, Аян', // verify: native speaker

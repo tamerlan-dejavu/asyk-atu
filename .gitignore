@@ -4,3 +4,7 @@ test-results
 playwright-report
 *.log
 .vercel
+.env
+.env.local
+.env.*.local
+coverage

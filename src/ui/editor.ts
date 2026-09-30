@@ -50,7 +50,15 @@ export function loadFromCode(code: string, id: string | null, verified: boolean)
   const r = decodeChallenge(code);
   if (!r.ok) return false;
   const c = r.challenge;
-  const d: Draft = { id, name: c.name, throws: c.throws, par: c.par, parAuto: false, asyks: c.asyks.map((a) => ({ ...a })), verifiedKey: null };
+  const d: Draft = {
+    id,
+    name: c.name,
+    throws: c.throws,
+    par: c.par,
+    parAuto: false,
+    asyks: c.asyks.map((a) => ({ ...a })),
+    verifiedKey: null,
+  };
   if (verified) d.verifiedKey = layoutKey(d);
   resetDraft(d);
   return true;

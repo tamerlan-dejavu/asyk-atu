@@ -2,9 +2,9 @@ import { ASYK, BLOCK, FIELD_H, FIELD_W, HEAVY, SAKA, WALL_RESTITUTION } from '..
 import type { AsykType } from '../../types';
 
 // Matter.js не имеет типов в сборке Phaser — работаем через минимальный any.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type MatterNS = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type MBody = any;
 
 /** Вытянутый шестиугольник («косточка») размером w×h. */
@@ -22,14 +22,7 @@ export function bonePolygon(w: number, h: number): { x: number; y: number }[] {
   ];
 }
 
-export function createAsykBody(
-  M: MatterNS,
-  label: string,
-  x: number,
-  y: number,
-  angle: number,
-  type: AsykType = 'normal',
-): MBody {
+export function createAsykBody(M: MatterNS, label: string, x: number, y: number, angle: number, type: AsykType = 'normal'): MBody {
   if (type === 'block') {
     return M.Bodies.rectangle(x, y, BLOCK.size, BLOCK.size, {
       label,

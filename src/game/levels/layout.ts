@@ -74,15 +74,7 @@ export function triangle(cx: number, cy: number, rows: number, dx: number, dy: n
   return out;
 }
 
-export function grid(
-  cx: number,
-  cy: number,
-  cols: number,
-  rows: number,
-  dx: number,
-  dy: number,
-  angle: number,
-): AsykSpec[] {
+export function grid(cx: number, cy: number, cols: number, rows: number, dx: number, dy: number, angle: number): AsykSpec[] {
   const out: AsykSpec[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {

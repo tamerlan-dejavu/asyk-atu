@@ -1,0 +1,23 @@
+# Минимальная конфигурация Supabase CLI (локальный запуск: supabase start).
+project_id = "asyk-atu"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+
+[db]
+port = 54322
+major_version = 15
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:4173"]
+# гостевой вход в один клик
+enable_anonymous_sign_ins = true
+
+[auth.email]
+enable_signup = true
+# в демонстрационном проекте подтверждение почты отключено (лимиты встроенной почты Supabase)
+enable_confirmations = false

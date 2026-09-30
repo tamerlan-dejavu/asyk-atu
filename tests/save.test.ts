@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { applyLevelResult, BACKUP_KEY, BACKUP_V1_KEY, defaultSave, sanitizeResume, SAVE_KEY, SaveStore, type StorageLike } from '../src/storage/save';
+import {
+  applyLevelResult,
+  BACKUP_KEY,
+  BACKUP_V1_KEY,
+  defaultSave,
+  sanitizeResume,
+  SAVE_KEY,
+  SaveStore,
+  type StorageLike,
+} from '../src/storage/save';
 
 function fakeStorage(initial: Record<string, string> = {}): StorageLike & { data: Record<string, string> } {
   const data = { ...initial };
@@ -97,7 +106,9 @@ describe('save', () => {
   });
 
   it('мусор в полях заменяется значениями по умолчанию', () => {
-    const st = fakeStorage({ [SAVE_KEY]: JSON.stringify({ v: 2, lang: 'de', sound: 'yes', unlocked: 'x', levels: { '1': 5 }, playerNames: [1, 2] }) });
+    const st = fakeStorage({
+      [SAVE_KEY]: JSON.stringify({ v: 2, lang: 'de', sound: 'yes', unlocked: 'x', levels: { '1': 5 }, playerNames: [1, 2] }),
+    });
     const s = new SaveStore(st);
     expect(s.data.lang).toBe('ru');
     expect(s.data.sound).toBe(true);

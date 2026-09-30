@@ -41,12 +41,15 @@ function card(it: ShopItem): string {
   if (eq) action = `<span class="pill on">${t('equipped')}</span>`;
   else if (owned) action = `<button class="btn sm" data-act="equip" data-arg="${it.id}">${t('equip')}</button>`;
   else if (it.pro) action = `<span class="pill">${t('proOnly')}</span>`;
-  else action = `<button class="btn sm primary" data-act="buyItem" data-arg="${it.id}" ${s.coins < it.price ? 'aria-disabled="true"' : ''}>${t('buy')} · ${it.price}</button>`;
+  else
+    action = `<button class="btn sm primary" data-act="buyItem" data-arg="${it.id}" ${s.coins < it.price ? 'aria-disabled="true"' : ''}>${t('buy')} · ${it.price}</button>`;
   return `<div class="scard${eq ? ' eq' : ''}">${preview(it)}<b>${t(('item_' + it.id) as Key)}</b>${action}</div>`;
 }
 
 function section(cat: ShopCat, title: Key): string {
-  return `<h3>${t(title)}</h3><div class="sgrid">${ITEMS.filter((i) => i.cat === cat).map(card).join('')}</div>`;
+  return `<h3>${t(title)}</h3><div class="sgrid">${ITEMS.filter((i) => i.cat === cat)
+    .map(card)
+    .join('')}</div>`;
 }
 
 export function shopScreen(overlay: ShopOverlay): string {

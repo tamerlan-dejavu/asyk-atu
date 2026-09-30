@@ -2,16 +2,7 @@ import type Phaser from 'phaser';
 import { ASYK, BLOCK, FIELD_H, FIELD_W, SAKA } from '../config';
 import { bonePolygon } from '../physics/bodies';
 import { mulberry32 } from '../levels/rng';
-import {
-  asykPal,
-  GOLDEN_PAL,
-  HEAVY_PAL,
-  sakaPal,
-  themePal,
-  type AsykPal,
-  type SakaPal,
-  type ThemePal,
-} from './looks';
+import { asykPal, GOLDEN_PAL, HEAVY_PAL, sakaPal, themePal, type AsykPal, type SakaPal, type ThemePal } from './looks';
 
 /** Поля вокруг слоёв параллакса, чтобы при сдвиге не открывались края. */
 export const LAYER_MARGIN = 24;
@@ -509,7 +500,12 @@ function drawBlock(ctx: Ctx, w: number, h: number): void {
   ctx.arc(cx, cy, 3.4, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = 'rgba(0,0,0,0.12)';
-  for (const [dx, dy] of [[-12, 8], [10, -13], [14, 12]]) ctx.fillRect(cx + dx, cy + dy, 3, 2);
+  for (const [dx, dy] of [
+    [-12, 8],
+    [10, -13],
+    [14, 12],
+  ])
+    ctx.fillRect(cx + dx, cy + dy, 3, 2);
   ctx.restore();
   rr(BLOCK.radius, -2);
   ctx.strokeStyle = 'rgba(255,255,255,0.45)';
@@ -678,9 +674,15 @@ export function bakeAll(scene: Phaser.Scene, S: number, zoneR: number, look: Loo
   bake(scene, 'asykGolden', TEX.asyk.w, TEX.asyk.h, S, (c) => drawAsyk(c, TEX.asyk.w, TEX.asyk.h, GOLDEN_PAL, 'golden'));
   bake(scene, 'asykHeavy', TEX.asyk.w, TEX.asyk.h, S, (c) => drawAsyk(c, TEX.asyk.w, TEX.asyk.h, HEAVY_PAL, 'heavy'));
   bake(scene, 'block', TEX.block.w, TEX.block.h, S, (c) => drawBlock(c, TEX.block.w, TEX.block.h));
-  bake(scene, 'shadowAsyk', TEX.shadowAsyk.w, TEX.shadowAsyk.h, S, (c) => drawShadow(c, TEX.shadowAsyk.w, TEX.shadowAsyk.h, ASYK.w, ASYK.h));
-  bake(scene, 'shadowSaka', TEX.shadowSaka.w, TEX.shadowSaka.h, S, (c) => drawShadow(c, TEX.shadowSaka.w, TEX.shadowSaka.h, SAKA.w, SAKA.h));
-  bake(scene, 'shadowBlock', TEX.shadowBlock.w, TEX.shadowBlock.h, S, (c) => drawShadow(c, TEX.shadowBlock.w, TEX.shadowBlock.h, BLOCK.size, BLOCK.size, true));
+  bake(scene, 'shadowAsyk', TEX.shadowAsyk.w, TEX.shadowAsyk.h, S, (c) =>
+    drawShadow(c, TEX.shadowAsyk.w, TEX.shadowAsyk.h, ASYK.w, ASYK.h),
+  );
+  bake(scene, 'shadowSaka', TEX.shadowSaka.w, TEX.shadowSaka.h, S, (c) =>
+    drawShadow(c, TEX.shadowSaka.w, TEX.shadowSaka.h, SAKA.w, SAKA.h),
+  );
+  bake(scene, 'shadowBlock', TEX.shadowBlock.w, TEX.shadowBlock.h, S, (c) =>
+    drawShadow(c, TEX.shadowBlock.w, TEX.shadowBlock.h, BLOCK.size, BLOCK.size, true),
+  );
   bake(scene, 'simpleShadowAsyk', ASYK.w, ASYK.h, S, (c) => drawSimpleShadow(c, ASYK.w, ASYK.h));
   bake(scene, 'simpleShadowSaka', SAKA.w, SAKA.h, S, (c) => drawSimpleShadow(c, SAKA.w, SAKA.h));
   bake(scene, 'simpleShadowBlock', BLOCK.size, BLOCK.size, S, (c) => drawSimpleShadow(c, BLOCK.size, BLOCK.size));

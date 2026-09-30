@@ -5,7 +5,12 @@ import { FIELD_H, FIELD_W } from './game/config';
 import { initUI } from './ui/ui';
 import { setLang } from './i18n';
 import { store } from './storage/save';
+import { cloud } from './cloud/cloud';
+import { logBuild } from './util/build';
+import { initAnalytics, initDebugPanel, initErrorReporting } from './util/observability';
 
+logBuild();
+initErrorReporting();
 setLang(store.data.lang);
 
 // devicePixelRatio ограничен 2: чёткая картинка на HiDPI без лишней нагрузки на телефоны.
@@ -28,6 +33,10 @@ const game = new Phaser.Game({
 });
 
 initUI();
+initAnalytics();
+initDebugPanel(() => game.loop.actualFps);
+// облако — надстройка: без сети или без настроек игра работает как раньше
+void cloud.init();
 
 // e2e и отладка: доступ к игре (только чтение).
 Object.defineProperty(window, '__game', { value: game, enumerable: false });

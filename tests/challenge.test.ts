@@ -18,7 +18,9 @@ import { endlessWave, nextReserve, waveCount, waveThrows } from '../src/game/lev
 
 function randomChallenge(seed: number, blocks = 2): Challenge {
   const rnd = mulberry32(seed);
-  const asyks = generateLayout(rnd, { zone: { ...ZONE }, count: 5 + Math.floor(rnd() * 6), golden: 1, heavy: 1, blocks, gap: 6 }).map(quantize);
+  const asyks = generateLayout(rnd, { zone: { ...ZONE }, count: 5 + Math.floor(rnd() * 6), golden: 1, heavy: 1, blocks, gap: 6 }).map(
+    quantize,
+  );
   return { name: 'Той-сынақ ' + seed, throws: 3 + Math.floor(rnd() * 8), par: 2, asyks };
 }
 
@@ -100,7 +102,11 @@ describe('валидация расстановки', () => {
     expect([...v.bad].sort()).toEqual([0, 1, 2]);
   });
   it('ограничения на число объектов', () => {
-    const many = Array.from({ length: 13 }, (_, i) => ({ x: ZONE.x - 150 + (i % 5) * 60, y: ZONE.y - 100 + Math.floor(i / 5) * 60, angle: 0 }));
+    const many = Array.from({ length: 13 }, (_, i) => ({
+      x: ZONE.x - 150 + (i % 5) * 60,
+      y: ZONE.y - 100 + Math.floor(i / 5) * 60,
+      angle: 0,
+    }));
     expect(validateLayout(many).tooMany).toBe(true);
     expect(validateLayout([]).tooFew).toBe(true);
     const blocks = Array.from({ length: 7 }, (_, i) => ({ x: ZONE.x - 120 + i * 45, y: ZONE.y, angle: 0, type: 'block' as const }));
@@ -124,6 +130,13 @@ describe('ссылки', () => {
     expect(parseHash('#d=2026-09-30&s=40')).toEqual({ kind: 'd', date: '2026-09-30', score: 40, name: undefined });
     expect(parseHash('#e=12345&s=300&w=4')).toMatchObject({ kind: 'e', seed: 12345, score: 300, wave: 4 });
   });
+  it('короткая ссылка #k= (8 символов)', () => {
+    expect(parseHash('#k=Ab3dEf7H&s=40')).toEqual({ kind: 'k', id: 'Ab3dEf7H', score: 40, name: undefined });
+    expect(parseHash('#k=short')).toBeNull();
+    expect(parseHash('#k=Ab3dEf7H!')).toBeNull();
+    expect(buildLink('https://x.test/', { kind: 'k', id: 'Ab3dEf7H' })).toBe('https://x.test/#k=Ab3dEf7H');
+  });
+
   it('мусор отвергается', () => {
     for (const h of ['', '#', '#x=1', '#d=nope', '#e=abc', '#c=' + 'A'.repeat(1000)]) expect(parseHash(h)).toBeNull();
     expect(parseHash('#d=2026-09-30&s=-5&n=<b>')?.['score' as never]).toBeUndefined();

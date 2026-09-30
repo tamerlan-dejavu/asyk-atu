@@ -73,17 +73,21 @@ export class Sim {
       enableSleeping: false,
     });
     M.Composite.add(this.engine.world, createWalls(M));
-    M.Events.on(this.engine, 'collisionStart', (e: { pairs: { bodyA: MBody; bodyB: MBody; collision: { supports: { x: number; y: number }[] } }[] }) => {
-      for (const p of e.pairs) {
-        const va = p.bodyA.velocity;
-        const vb = p.bodyB.velocity;
-        const imp = Math.hypot(va.x - vb.x, va.y - vb.y);
-        const sup = p.collision.supports?.[0] ?? p.bodyA.position;
-        const a = p.bodyA.label;
-        const b = p.bodyB.label;
-        this.pendingHits.push({ a, b, impulse: imp, x: sup.x, y: sup.y });
-      }
-    });
+    M.Events.on(
+      this.engine,
+      'collisionStart',
+      (e: { pairs: { bodyA: MBody; bodyB: MBody; collision: { supports: { x: number; y: number }[] } }[] }) => {
+        for (const p of e.pairs) {
+          const va = p.bodyA.velocity;
+          const vb = p.bodyB.velocity;
+          const imp = Math.hypot(va.x - vb.x, va.y - vb.y);
+          const sup = p.collision.supports?.[0] ?? p.bodyA.position;
+          const a = p.bodyA.label;
+          const b = p.bodyB.label;
+          this.pendingHits.push({ a, b, impulse: imp, x: sup.x, y: sup.y });
+        }
+      },
+    );
   }
 
   addAsyk(id: string, spec: AsykSpec): SimBody {

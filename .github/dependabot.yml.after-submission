@@ -1,0 +1,15 @@
+# Dependabot ВКЛЮЧАЕТСЯ ПОСЛЕ СДАЧИ (1 октября), чтобы в последние часы не приходили обновления зависимостей.
+# Чтобы включить: переименовать файл в dependabot.yml, удалить строку «updates: []» и раскомментировать блок.
+version: 2
+updates: []
+# updates:
+#   - package-ecosystem: npm
+#     directory: /
+#     schedule: { interval: weekly }
+#     groups:
+#       all-npm: { patterns: ['*'] }
+#   - package-ecosystem: github-actions
+#     directory: /
+#     schedule: { interval: weekly }
+#     groups:
+#       all-actions: { patterns: ['*'] }
