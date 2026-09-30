@@ -4,6 +4,7 @@ import { FAR_H, LAYER_MARGIN, TEX } from '../render/textures';
 import type { AsykType } from '../../types';
 import { ASPECT, fitCamera, project as projectPure, type CamParams, type Projected } from './camera3d';
 import { meshTransform, type BodySnapshot } from './sync';
+import { assetUrl } from '../render/art';
 import {
   CanvasTexture,
   Color,
@@ -25,6 +26,7 @@ import {
   type BufferGeometry,
   type Material,
   type Texture,
+  GLTFLoader,
 } from './three-lite';
 
 export type CameraMode = 'idle' | 'aim' | 'follow' | 'settle';
@@ -78,6 +80,9 @@ export class ThreeView {
   private blobGeo: PlaneGeometry | null = null;
   private blobTex: Texture | null = null;
   private resizeObs: ResizeObserver | null = null;
+  /** 3D-модель асыка (GLB): геометрия в единицах поля (длина = ASYK.w, ширина = ASYK.h) и исходный материал */
+  private asykModel: { geo: BufferGeometry; mat: MeshStandardMaterial } | null = null;
+  private destroyed = false;
   lost = false;
 
   constructor(
@@ -114,6 +119,89 @@ export class ThreeView {
     this.resize();
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(opt.overlay);
+    void this.loadAsykModel();
+  }
+
+  /**
+   * Модель асыка «Asyq (асық, асык) 3d model» — cozaim, CC BY-NC 4.0 (подготовлена scripts/optimize-asyk-model.ts).
+   * Пока грузится или если не загрузилась — асыки остаются выдавленными «косточками» с текстурой.
+   */
+  private async loadAsykModel(): Promise<void> {
+    try {
+      const gltf = await new GLTFLoader().loadAsync(assetUrl('models/asyk.glb'));
+      if (this.destroyed) return;
+      let found: Mesh | null = null;
+      gltf.scene.traverse((o) => {
+        if (!found && (o as Mesh).isMesh) found = o as Mesh;
+      });
+      const mesh = found as Mesh | null;
+      if (!mesh) return;
+      const mat = mesh.material as MeshStandardMaterial;
+      this.asykModel = { geo: mesh.geometry, mat };
+      this.disposables.push(mesh.geometry, mat);
+      [mat.map, mat.metalnessMap].forEach((t) => t && this.disposables.push(t));
+      // уже созданные асыки перестраиваются моделью при следующей синхронизации
+      for (const [id, m] of this.meshes) if (m.kind.startsWith('asyk:') && m.kind !== 'asyk:block') this.removeMesh(id);
+    } catch {
+      /* без модели — прежняя геометрия */
+    }
+  }
+
+  /** Средний цвет текстуры набора асыков (кость / красный / дерево), нормированный: им тонируется модель. */
+  private setTint(): Color {
+    const c = this.opt.canvas('asyk');
+    if (!c) return new Color(1, 1, 1);
+    try {
+      const g = c.getContext('2d')!;
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let r = 0;
+      let gg = 0;
+      let b = 0;
+      let n = 0;
+      for (let i = 0; i < d.length; i += 16) {
+        if (d[i + 3] < 200) continue;
+        r += d[i];
+        gg += d[i + 1];
+        b += d[i + 2];
+        n++;
+      }
+      if (!n) return new Color(1, 1, 1);
+      const mx = Math.max(r, gg, b);
+      // светлая кость — почти без тонировки; цветные наборы — в свой цвет
+      return new Color(r / mx, gg / mx, b / mx).lerp(new Color(1, 1, 1), 0.25);
+    } catch {
+      return new Color(1, 1, 1);
+    }
+  }
+
+  /** Материал модели по типу асыка: обычный — тонировка набора, золотой — металл с блеском, тяжёлый — тёмный. */
+  private modelMaterial(type: AsykType): MeshStandardMaterial {
+    const key = `model:${type}`;
+    const cached = this.mats.get(key);
+    if (cached) return cached[0] as MeshStandardMaterial;
+    const m = this.asykModel!.mat.clone();
+    if (type === 'golden') {
+      m.color = new Color(0xffc53a);
+      m.metalness = 0.75;
+      m.roughness = 0.32;
+      m.emissive = new Color(0x6a4a00);
+      m.emissiveIntensity = 0.45;
+    } else if (type === 'heavy') {
+      m.color = new Color(0x9a96a2);
+      m.metalness = 0.35;
+      m.roughness = 0.5;
+    } else {
+      m.color = this.setTint();
+    }
+    // лёгкая подсветка собственной текстурой: асык не тонет в тени и на тёмной (ночной) карте
+    if (type !== 'golden' && m.map) {
+      m.emissiveMap = m.map;
+      m.emissive = type === 'heavy' ? new Color(0x55555f) : m.color.clone().multiplyScalar(0.28);
+      m.emissiveIntensity = 1;
+    }
+    this.mats.set(key, [m]);
+    this.disposables.push(m);
+    return m;
   }
 
   // ---------------------------------------------------------------- сцена
@@ -340,7 +428,10 @@ export class ThreeView {
     const key = `${kind}:${b.type}`;
     if (found && found.kind === key) return found;
     if (found) this.removeMesh(b.id);
-    const body = new Mesh(this.geometry(kind), this.materials(kind, b.type));
+    const model = kind === 'asyk' && this.asykModel;
+    const body = model
+      ? new Mesh(this.asykModel!.geo, this.modelMaterial(b.type))
+      : new Mesh(this.geometry(kind), this.materials(kind, b.type));
     body.castShadow = this.opt.quality === 'high';
     body.receiveShadow = false;
     const group = new Group();
@@ -397,6 +488,9 @@ export class ThreeView {
   /** Площадка/скин изменились (магазин): перерисованные 2D-холсты заново уходят в текстуры. */
   refreshTextures(): void {
     this.textures.forEach((t) => (t.needsUpdate = true));
+    // набор асыков сменился — тонировка модели пересчитывается
+    const normal = this.mats.get('model:normal');
+    if (normal) (normal[0] as MeshStandardMaterial).color = this.setTint();
   }
 
   // ---------------------------------------------------------------- камера
@@ -513,6 +607,7 @@ export class ThreeView {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.resizeObs?.disconnect();
     for (const id of [...this.meshes.keys()]) this.removeMesh(id);
     this.disposables.forEach((d) => d.dispose());

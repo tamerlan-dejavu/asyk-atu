@@ -19,3 +19,5 @@ export {
   WebGLRenderer,
 } from 'three';
 export type { BufferGeometry, Material, Texture } from 'three';
+// 3D-модель асыка (GLB) — только загрузчик, без остальных примеров Three.js
+export { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
