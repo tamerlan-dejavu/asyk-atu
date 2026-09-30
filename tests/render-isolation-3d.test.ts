@@ -49,7 +49,7 @@ describe('render-isolation: 2D и 3D', () => {
     ] as const) {
       expect(play(lvl, p, a, '3d')).toEqual(play(lvl, p, a, '2d'));
     }
-  });
+  }, 60_000); // под сбором покрытия физика заметно медленнее
 
   it('трансформ меша: X = x, Z = y, поворот против часовой, подъём = z', () => {
     const t = meshTransform({ id: 'a', kind: 'asyk', type: 'normal', x: 100, y: 200, angle: 0.5, z: 7, alpha: 1 });
