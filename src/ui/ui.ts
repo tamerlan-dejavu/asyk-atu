@@ -12,7 +12,7 @@ import { getLang, onLang, setLang, t, type Key } from '../i18n';
 import { activatePro, buyItem, equipItem, itemById } from '../shop/catalog';
 import { CUSTOM_LIMIT, store } from '../storage/save';
 import type { BotLevel, CustomLevel, Difficulty, Lang, LoftLevel, Quality, Ruleset } from '../types';
-import { dailyKey as rsDailyKey, levelKey } from '../game/rules/ruleset';
+import { cloudKey, dailyKey as rsDailyKey, levelKey } from '../game/rules/ruleset';
 import { $, botLabel, HORN, levelName, modeLabel, ornament, playerName, sakaIcon, setHtml, stars, toast, u } from './common';
 import * as ed from './editor';
 import { recordsScreen, type RecordsTab } from './records';
@@ -569,12 +569,13 @@ function saveProgressHint(r: ResultData): string {
 function submitToCloud(r: ResultData): void {
   if (!FEATURES.cloud || !cloud.signedIn || r.editorTest) return;
   const s = r.summary;
+  const ck = (k: string) => cloudKey(k, r.ruleset);
   const base = { kind: 'result' as const, stars: s.stars, throws: s.throwsUsed, combo: s.bestCombo };
-  if (s.mode === 'campaign') cloud.submitResult({ ...base, mode: 'level', key: `level:${r.levelId}`, score: s.score });
-  else if (s.mode === 'daily') cloud.submitResult({ ...base, mode: 'daily', key: `daily:${r.dailyKey ?? dateKey()}`, score: s.score });
-  else if (s.mode === 'endless' && r.endless) cloud.submitResult({ ...base, mode: 'endless', key: 'endless', score: r.endless.total });
+  if (s.mode === 'campaign') cloud.submitResult({ ...base, mode: 'level', key: ck(`level:${r.levelId}`), score: s.score });
+  else if (s.mode === 'daily') cloud.submitResult({ ...base, mode: 'daily', key: ck(`daily:${r.dailyKey ?? dateKey()}`), score: s.score });
+  else if (s.mode === 'endless' && r.endless) cloud.submitResult({ ...base, mode: 'endless', key: ck('endless'), score: r.endless.total });
   else if (s.mode === 'custom' && r.challenge?.shortId)
-    cloud.submitResult({ ...base, mode: 'challenge', key: `challenge:${r.challenge.shortId}`, score: s.score });
+    cloud.submitResult({ ...base, mode: 'challenge', key: ck(`challenge:${r.challenge.shortId}`), score: s.score });
 }
 
 function friendCompare(r: ResultData, my: number): string {
@@ -804,8 +805,8 @@ function playPendingLink(): void {
     const shortId = pendingShort?.id;
     if (shortId) cloud.played(shortId);
     start({ mode: 'custom', levelId: 300, code: l.code, shortId, ...base });
-  } else if (l.kind === 'd') start({ mode: 'daily', levelId: 200, dailyKey: l.date, ...base });
-  else if (l.kind === 'e') start({ mode: 'endless', levelId: 400, runSeed: l.seed, ...base });
+  } else if (l.kind === 'd') start({ mode: 'daily', levelId: 200, dailyKey: l.date, ruleset: l.ruleset ?? 'classic', ...base });
+  else if (l.kind === 'e') start({ mode: 'endless', levelId: 400, runSeed: l.seed, ruleset: l.ruleset ?? 'classic', ...base });
   pendingLink = null;
   pendingShort = null;
 }
@@ -1126,13 +1127,15 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
     }
     case 'shareDaily': {
       const key = result?.dailyKey ?? dateKey();
-      const best = result?.mode === 'daily' ? result.summary.score : store.data.daily[key]?.best;
-      void shareUrl(makeLink({ kind: 'd', date: key, score: best, name: senderName() }));
+      const best = result?.mode === 'daily' ? result.summary.score : store.data.daily[rsDailyKey(key, store.data.ruleset)]?.best;
+      void shareUrl(makeLink({ kind: 'd', date: key, score: best, name: senderName(), ruleset: result?.ruleset ?? store.data.ruleset }));
       break;
     }
     case 'shareEndless':
       if (result?.endless)
-        void shareUrl(makeLink({ kind: 'e', seed: result.endless.runSeed, score: result.endless.total, name: senderName() }));
+        void shareUrl(
+          makeLink({ kind: 'e', seed: result.endless.runSeed, score: result.endless.total, name: senderName(), ruleset: result.ruleset }),
+        );
       break;
     case 'card':
       if (result) cardFor(result);

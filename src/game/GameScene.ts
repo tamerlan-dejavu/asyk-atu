@@ -591,7 +591,9 @@ export class GameScene extends Phaser.Scene {
   private startRound(req: StartRequest, resume?: ResumeState): void {
     this.clearWorld();
     this.req = { ...req };
-    this.ruleset = resume?.extra.ruleset ?? req.ruleset ?? currentRuleset();
+    const fromCode = req.mode === 'custom' && req.code ? decodeChallenge(req.code) : null;
+    this.ruleset =
+      resume?.extra.ruleset ?? (fromCode?.ok ? (fromCode.challenge.ruleset ?? 'classic') : undefined) ?? req.ruleset ?? currentRuleset();
     this.coinsEarned = 0;
     const ex = resume?.extra;
     this.ctx = {
@@ -786,7 +788,10 @@ export class GameScene extends Phaser.Scene {
       .map((b) => ({ x: b.body.position.x, y: b.body.position.y, angle: b.body.angle, type: b.type }));
 
     const M = (Phaser.Physics.Matter as any).Matter;
-    const { shot } = await chooseShot(M, level.zone, specs, this.ctx.botLevel, this.botRnd, { deadlineMs: 800 });
+    const { shot } = await chooseShot(M, level.zone, specs, this.ctx.botLevel, this.botRnd, {
+      deadlineMs: 800,
+      loft: this.ruleset === 'loft',
+    });
     if (token !== this.botToken || !this.round) return;
     this.botThinking = false;
     // анимация «бот целится»: видимое оттягивание сақа 600–900 мс
@@ -845,14 +850,14 @@ export class GameScene extends Phaser.Scene {
     if (this.tutorial && this.round?.machine.state === 'AIMING') bus.emit('tutorial', { step: this.round.throwsUsed === 0 ? 0 : 3 });
   }
 
-  private onRelease(power: number, dirX: number, dirY: number): void {
+  private onRelease(power: number, dirX: number, dirY: number, loft?: Loft): void {
     const r = this.round;
     const sim = this.sim;
     if (!r || !sim || r.machine.state !== 'AIMING') return;
     this.powerText.setVisible(false);
     const v = POWER_MIN + (POWER_MAX - POWER_MIN) * power;
     if (this.ruleset === 'loft') {
-      const l = launchVelocity(power, this.currentLoft(), dirX, dirY);
+      const l = launchVelocity(power, loft ?? this.currentLoft(), dirX, dirY);
       sim.launchSaka(l.vx, l.vy, Math.atan2(dirY, dirX), l.vz, LOFT.Z0);
     } else sim.launchSaka(dirX * v, dirY * v, Math.atan2(dirY, dirX));
     this.sprites.set('saka', this.makeSprites('saka', 'normal'));
@@ -888,7 +893,7 @@ export class GameScene extends Phaser.Scene {
         if (this.botAim.t >= this.botAim.dur) {
           const s = this.botAim.shot;
           this.botAim = null;
-          this.onRelease(s.power, s.dirX, s.dirY);
+          this.onRelease(s.power, s.dirX, s.dirY, s.loft);
         }
       }
       if (r.machine.state === 'FLYING' || r.machine.state === 'SETTLING') this.stepPhysics(dt);

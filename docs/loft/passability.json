@@ -1,0 +1,17 @@
+[
+  { "id": 1, "throws": 6, "parClassic": 4, "classic": 3, "loftAll": 3, "loftLowOnly": "-", "parLoft": 4 },
+  { "id": 2, "throws": 6, "parClassic": 4, "classic": 4, "loftAll": 1, "loftLowOnly": "-", "parLoft": 2 },
+  { "id": 3, "throws": 7, "parClassic": 5, "classic": 4, "loftAll": 2, "loftLowOnly": "-", "parLoft": 3 },
+  { "id": 4, "throws": 7, "parClassic": 5, "classic": 4, "loftAll": 3, "loftLowOnly": "-", "parLoft": 4 },
+  { "id": 5, "throws": 7, "parClassic": 6, "classic": 5, "loftAll": 5, "loftLowOnly": "-", "parLoft": 6 },
+  { "id": 6, "throws": 6, "parClassic": 4, "classic": 2, "loftAll": 2, "loftLowOnly": "-", "parLoft": 3 },
+  { "id": 7, "throws": 7, "parClassic": 5, "classic": 5, "loftAll": 5, "loftLowOnly": "-", "parLoft": 6 },
+  { "id": 8, "throws": 7, "parClassic": 5, "classic": 4, "loftAll": 4, "loftLowOnly": 4, "parLoft": 5 },
+  { "id": 9, "throws": 8, "parClassic": 6, "classic": 7, "loftAll": 4, "loftLowOnly": 4, "parLoft": 5 },
+  { "id": 10, "throws": 8, "parClassic": 6, "classic": null, "loftAll": 2, "loftLowOnly": 2, "parLoft": 3 },
+  { "id": 11, "throws": 7, "parClassic": 5, "classic": null, "loftAll": 4, "loftLowOnly": 4, "parLoft": 5 },
+  { "id": 12, "throws": 8, "parClassic": 6, "classic": null, "loftAll": 3, "loftLowOnly": null, "parLoft": 4 },
+  { "id": 13, "throws": 8, "parClassic": 6, "classic": 5, "loftAll": 5, "loftLowOnly": null, "parLoft": 6 },
+  { "id": 14, "throws": 9, "parClassic": 7, "classic": 5, "loftAll": 4, "loftLowOnly": 4, "parLoft": 5 },
+  { "id": 15, "throws": 10, "parClassic": 8, "classic": null, "loftAll": 4, "loftLowOnly": 5, "parLoft": 5 }
+]

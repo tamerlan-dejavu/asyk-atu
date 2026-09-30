@@ -1,6 +1,6 @@
 import { BLOCK, ZONE } from '../game/config';
 import { asykGap, insideZone } from '../game/levels/layout';
-import type { AsykSpec, AsykType, LevelDef } from '../types';
+import type { AsykSpec, AsykType, LevelDef, Ruleset } from '../types';
 
 /** Версия кода; ссылка начинается с «1.». */
 export const CODE_PREFIX = '1.';
@@ -17,6 +17,8 @@ export interface Challenge {
   throws: number;
   par: number;
   asyks: AsykSpec[];
+  /** набор правил испытания (бит в заголовке кода; старые коды — классика) */
+  ruleset?: Ruleset;
 }
 
 export type DecodeError = 'format' | 'version' | 'checksum' | 'range' | 'invalid';
@@ -148,7 +150,8 @@ export function encodeChallenge(c: Challenge): string {
   w.write(throws, 4);
   w.write(par, 4);
   w.write(asyks.length, 5);
-  w.write(0, 3);
+  w.write(c.ruleset === 'loft' ? 1 : 0, 1); // бит набора правил
+  w.write(0, 2);
   w.write(nameBytes.length, 8);
   for (const b of nameBytes) w.write(b, 8);
   for (const a of asyks) {
@@ -174,7 +177,8 @@ export function decodeChallenge(code: string): DecodeResult {
     const throws = r.read(4);
     const par = r.read(4);
     const count = r.read(5);
-    r.read(3);
+    const ruleset: Ruleset = r.read(1) === 1 ? 'loft' : 'classic';
+    r.read(2);
     const nameLen = r.read(8);
     if (throws < MIN_THROWS || throws > MAX_THROWS || par < 1 || par > throws) return { ok: false, error: 'range' };
     if (count < 1 || count > MAX_ASYKS + MAX_BLOCKS || nameLen > MAX_NAME * 4) return { ok: false, error: 'range' };
@@ -190,7 +194,7 @@ export function decodeChallenge(code: string): DecodeResult {
       asyks.push({ x, y, angle: (step * Math.PI) / ANGLE_STEPS, type });
     }
     if (!validateLayout(asyks).ok) return { ok: false, error: 'invalid' };
-    return { ok: true, challenge: { name, throws, par, asyks } };
+    return { ok: true, challenge: { name, throws, par, asyks, ruleset } };
   } catch {
     return { ok: false, error: 'format' };
   }

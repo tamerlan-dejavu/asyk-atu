@@ -8,6 +8,8 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 90_000,
   retries: process.env.CI ? 1 : 0,
+  // тесты 3D и навеса гоняют программный WebGL: параллельные браузеры упираются в CPU и ловят тайм-ауты
+  workers: 1,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: external ?? local,

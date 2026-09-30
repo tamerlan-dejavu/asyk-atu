@@ -26,8 +26,11 @@ export const GENERIC_LIMITS: LevelLimit[] = [
 ];
 
 export function allLimits(): LevelLimit[] {
+  const levels = [...LEVELS, ...PRO_LEVELS];
   return [
-    ...[...LEVELS, ...PRO_LEVELS].map((l) => ({ mode: 'level' as const, key: `level:${l.id}`, maxScore: levelMax(l) })),
+    ...levels.map((l) => ({ mode: 'level' as const, key: `level:${l.id}`, maxScore: levelMax(l) })),
+    // навес: те же формулы очков — те же пределы; ключ с набором правил (как в рейтинге)
+    ...levels.map((l) => ({ mode: 'level' as const, key: `level:${l.id}:loft`, maxScore: levelMax(l) })),
     ...GENERIC_LIMITS,
   ];
 }
