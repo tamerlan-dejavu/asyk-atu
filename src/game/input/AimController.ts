@@ -33,6 +33,17 @@ export interface AimState extends AimResult {
   ay: number;
   cx: number;
   cy: number;
+  /** экранные (логические) координаты якоря и пальца — для «резинки» жеста в 3D */
+  sax: number;
+  say: number;
+  scx: number;
+  scy: number;
+}
+
+/** Преобразование ввода для 3D-вида: экран → точка на земле; gain — усиление оттягивания. */
+export interface AimMapping {
+  toWorld: (sx: number, sy: number) => { x: number; y: number } | null;
+  gain: number;
 }
 
 export interface AimOptions {
@@ -43,9 +54,27 @@ export interface AimOptions {
   onMove?: (s: AimState) => void;
   onRelease: (power: number, dirX: number, dirY: number) => void;
   onCancel?: () => void;
+  /** 3D-вид: где на земле находится точка экрана (null — 2D, экран = мир) */
+  mapping?: () => AimMapping | null;
 }
 
-const IDLE: AimState = { active: false, mode: 'pointer', ax: 0, ay: 0, cx: 0, cy: 0, pull: 0, power: 0, dirX: 0, dirY: -1, valid: false };
+const IDLE: AimState = {
+  active: false,
+  mode: 'pointer',
+  ax: 0,
+  ay: 0,
+  cx: 0,
+  cy: 0,
+  sax: 0,
+  say: 0,
+  scx: 0,
+  scy: 0,
+  pull: 0,
+  power: 0,
+  dirX: 0,
+  dirY: -1,
+  valid: false,
+};
 
 /**
  * Прицеливание на Pointer Events (мышь и палец одним кодом).
@@ -89,6 +118,9 @@ export class AimController {
       if (this.pointerId !== null || this.charging || !this.o.canAim()) return;
       const p = this.toLogical(e);
       if (p.y < AIM_ZONE_Y) return;
+      const map = this.o.mapping?.() ?? null;
+      const w = map ? map.toWorld(p.x, p.y) : p;
+      if (!w) return;
       e.preventDefault();
       this.pointerId = e.pointerId;
       try {
@@ -97,14 +129,19 @@ export class AimController {
         /* не критично */
       }
       this.keyPreview = false;
-      this.state = { ...IDLE, active: true, mode: 'pointer', ax: p.x, ay: p.y, cx: p.x, cy: p.y };
+      this.state = { ...IDLE, active: true, mode: 'pointer', ax: w.x, ay: w.y, cx: w.x, cy: w.y, sax: p.x, say: p.y, scx: p.x, scy: p.y };
       this.o.onStart?.();
     });
     on(c, 'pointermove', (e: PointerEvent) => {
       if (e.pointerId !== this.pointerId) return;
       const p = this.toLogical(e);
-      const a = computeAim(this.state.ax, this.state.ay, p.x, p.y);
-      this.state = { ...this.state, ...a, cx: p.x, cy: p.y };
+      const map = this.o.mapping?.() ?? null;
+      // 3D: точка на земле; если луч ушёл выше горизонта — остаётся последняя валидная (оттягивание зажато)
+      const w = map ? (map.toWorld(p.x, p.y) ?? { x: this.state.cx, y: this.state.cy }) : p;
+      const g = map ? map.gain : 1;
+      const s0 = this.state;
+      const a = computeAim(s0.ax, s0.ay, s0.ax + (w.x - s0.ax) * g, s0.ay + (w.y - s0.ay) * g);
+      this.state = { ...s0, ...a, cx: w.x, cy: w.y, scx: p.x, scy: p.y };
       this.o.onMove?.(this.state);
     });
     const finish = (e: PointerEvent) => {

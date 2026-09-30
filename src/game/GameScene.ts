@@ -36,6 +36,10 @@ import { DepthTracker } from './render/depth';
 import { Effects, type FxFlags } from './render/effects';
 import { Parallax } from './render/parallax';
 import { bakeAll, bakeLook, TEX } from './render/textures';
+import { themePal } from './render/looks';
+import { fitCamera, screenToGround } from './view3d/camera3d';
+import type { BodySnapshot } from './view3d/sync';
+import type { ThreeView } from './view3d/ThreeView';
 import { Round, specId } from './rules/round';
 import type { GameState } from './rules/turnState';
 
@@ -127,6 +131,14 @@ export class GameScene extends Phaser.Scene {
   private botThinking = false;
   private botAim: { t: number; dur: number; shot: Shot } | null = null;
   private botRnd: () => number = mulberry32(1);
+  // ---- 3D-вид (эксперимент): только отображение, физика та же
+  private view3d: ThreeView | null = null;
+  private view3dLoading = false;
+  private worldLayers: Phaser.GameObjects.Image[] = [];
+  private fps3d = { t: 0, n: 0 };
+  private lost3dAt = -1;
+  private idle3d: { x: number; y: number; angle: number } | null = null;
+  private readonly gain3d = fitCamera().report.sakaScale;
 
   constructor() {
     super('game');
@@ -150,10 +162,11 @@ export class GameScene extends Phaser.Scene {
     const far = this.add.image(-24, -24, 'far').setOrigin(0, 0).setDisplaySize(gw, 190).setDepth(D_FAR);
     const near = this.add.image(-24, -24, 'near').setOrigin(0, 0).setDisplaySize(gw, gh).setDepth(D_NEAR);
     this.parallax = new Parallax(far, ground, near);
-    this.add
+    const zoneImg = this.add
       .image(ZONE.x, ZONE.y, 'zone')
       .setDisplaySize((ZONE.r + 24) * 2, (ZONE.r + 24) * 2)
       .setDepth(D_ZONE);
+    this.worldLayers = [ground, far, near, zoneImg];
 
     this.aimGfx = this.add.graphics().setDepth(D_AIM);
     this.powerText = this.add
@@ -180,6 +193,17 @@ export class GameScene extends Phaser.Scene {
       onMove: (s) => this.onAimMove(s),
       onRelease: (p, dx, dy) => this.onRelease(p, dx, dy),
       onCancel: () => this.onAimCancel(),
+      // 3D: точка экрана → точка на земле (по базовой, неподвижной камере — жест не «плывёт» за камерой)
+      mapping: () =>
+        this.view3d
+          ? {
+              toWorld: (sx: number, sy: number) => {
+                const g = screenToGround(this.view3d!.base, sx, sy);
+                return g ? { x: g.x, y: g.z } : null;
+              },
+              gain: this.gain3d,
+            }
+          : null,
     });
 
     // Указатель для параллакса (только десктоп: на телефоне остаётся дрейф).
@@ -211,7 +235,11 @@ export class GameScene extends Phaser.Scene {
     bus.on('pause', () => this.pauseGame());
     bus.on('resume', () => this.resumeGame());
     bus.on('toMenu', () => this.toMenu());
-    bus.on('look', () => bakeLook(this, S, store.data.equipped));
+    bus.on('look', () => {
+      bakeLook(this, S, store.data.equipped);
+      this.view3d?.refreshTextures();
+    });
+    bus.on('settings', () => this.applyViewSetting(true));
     bus.on('skipTutorial', () => {
       store.update((s) => {
         s.tutorialDone = true;
@@ -221,6 +249,173 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.publish();
+    this.applyViewSetting(false);
+  }
+
+  // ------------------------------------------------------------------ 3D-вид (эксперимент)
+  private wants3D(): boolean {
+    const q = new URLSearchParams(location.search).get('view');
+    if (q === '3d') return true;
+    if (q === '2d') return false;
+    return store.data.view === '3d' && !store.data.view3dBlocked;
+  }
+
+  private view3dQuality: 'high' | 'low' | null = null;
+
+  /** Включить/выключить 3D по настройке. Пересоздаёт вид при смене качества или темы. */
+  private applyViewSetting(fromSettings: boolean): void {
+    const want = this.wants3D();
+    const q = this.quality3d();
+    if (want && this.view3d && fromSettings && q !== this.view3dQuality) {
+      this.disable3D();
+      void this.enable3D();
+      return;
+    }
+    if (want && !this.view3d) void this.enable3D();
+    else if (!want && this.view3d) this.disable3D();
+  }
+
+  private quality3d(): 'high' | 'low' {
+    const q = store.data.quality;
+    return q === 'low' || (q === 'auto' && this.autoLow) ? 'low' : 'high';
+  }
+
+  private async enable3D(): Promise<void> {
+    if (this.view3d || this.view3dLoading) return;
+    if (!hasWebGLQuick()) {
+      this.fallback2D('view3dNoWebgl');
+      return;
+    }
+    this.view3dLoading = true;
+    bus.emit('toast', { key: 'view3dLoading' });
+    const quality = this.quality3d();
+    const th = themePal(store.data.equipped.theme);
+    try {
+      const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
+      const mod = await Promise.race([import('./view3d/ThreeView'), timeout]);
+      const v = new mod.ThreeView(this.game.canvas.parentElement!, {
+        overlay: this.game.canvas,
+        canvas: (key) => (this.textures.exists(key) ? (this.textures.get(key).getSourceImage() as HTMLCanvasElement) : null),
+        quality,
+        reducedMotion: this.reducedMq.matches,
+        palette: { sky: th.sky[0], horizon: th.sky[2], ground: th.ground[1], hemiSky: th.sky[0], hemiGround: th.ground[1] },
+      });
+      if (!this.wants3D()) {
+        v.destroy();
+        return;
+      }
+      this.view3d = v;
+      this.view3dQuality = quality;
+      this.fps3d = { t: 0, n: 0 };
+      this.apply3DLayers(true);
+      (window as unknown as { __asyk3d?: unknown }).__asyk3d = { stats: () => v.stats() };
+    } catch {
+      this.fallback2D('view3dFallback');
+    } finally {
+      this.view3dLoading = false;
+    }
+  }
+
+  private disable3D(): void {
+    const v = this.view3d;
+    if (!v) return;
+    this.view3d = null;
+    this.idle3d = null;
+    v.destroy();
+    this.apply3DLayers(false);
+    (window as unknown as { __asyk3d?: unknown }).__asyk3d = undefined;
+  }
+
+  /** Откат в 2D (нет WebGL, контекст потерян, FPS < 40): 3D на этом устройстве выключается до ручного включения. */
+  private fallback2D(key: 'view3dFallback' | 'view3dNoWebgl'): void {
+    this.disable3D();
+    if (new URLSearchParams(location.search).get('view') !== '3d') store.update((s) => (s.view3dBlocked = true));
+    bus.emit('toast', { key });
+  }
+
+  private apply3DLayers(on: boolean): void {
+    this.worldLayers.forEach((l) => l.setVisible(!on));
+    this.cameras.main.setBackgroundColor(on ? 'rgba(0,0,0,0)' : '#b8823f');
+    if (on) {
+      this.sprites.forEach((s) => this.hideSprites(s));
+      this.hideSprites(this.idle);
+    } else if (this.round?.machine.state === 'AIMING') this.showIdleSaka();
+  }
+
+  /** Координаты для оверлея (прицел, очки, пыль): в 2D — как есть, в 3D — проекция точки на земле. */
+  private toScreen(x: number, y: number, h = 0): { x: number; y: number } {
+    return this.view3d ? this.view3d.project(x, y, h) : { x, y };
+  }
+
+  private snapshot3D(): BodySnapshot[] {
+    const sim = this.sim;
+    const out: BodySnapshot[] = [];
+    if (!sim) return out;
+    const f = this.flags;
+    for (const sb of sim.bodies.values()) {
+      if (sb.removed) continue;
+      let z = f.bounce ? this.depth.z(sb.id, this.nowMs) : 0;
+      let alpha = 1;
+      if (sb.kind === 'asyk' && sb.scored) {
+        const u = Math.min(1, ((sim.tick - sb.scoredTick) * STEP_MS) / OUT_FADE_MS);
+        alpha = 1 - u;
+      }
+      if (sb.kind === 'saka') {
+        if (f.bounce) z = Math.max(z, DepthTracker.flightZ(sb.body.speed, MAX_BODY_SPEED) * 2);
+        if (this.sakaFade >= 0) alpha = 0.6;
+      }
+      const p = sb.body.position;
+      out.push({ id: sb.id, kind: sb.kind, type: sb.type, x: p.x, y: p.y, angle: sb.body.angle, z, alpha });
+    }
+    if (this.idle3d)
+      out.push({ id: 'idle', kind: 'saka', type: 'normal', x: this.idle3d.x, y: this.idle3d.y, angle: this.idle3d.angle, z: 0, alpha: 1 });
+    return out;
+  }
+
+  private update3D(dt: number): void {
+    const v = this.view3d!;
+    const r = this.round;
+    const st = r?.machine.state;
+    const a = this.aimState();
+    // поза сақа на линии (натяжение при прицеливании) — та же, что в 2D
+    if (r && st === 'AIMING') {
+      const p0 = this.idlePos;
+      if (a.active) {
+        const back = Math.min(a.pull, MAX_PULL) * 0.25;
+        this.idle3d = { x: p0.x - a.dirX * back, y: p0.y - a.dirY * back, angle: Math.atan2(a.dirY, a.dirX) };
+        v.setCameraMode('aim', { power: a.power });
+      } else {
+        this.idle3d = { x: p0.x, y: p0.y, angle: -Math.PI / 2 };
+        v.setCameraMode('idle');
+      }
+    } else {
+      this.idle3d = null;
+      const sk = this.sim?.saka;
+      if (st === 'FLYING' && sk && sk.body.speed > 2) v.setCameraMode('follow', { x: sk.body.position.x, y: sk.body.position.y });
+      else if (st === 'SETTLING' || st === 'RESOLVING' || st === 'FLYING') v.setCameraMode('settle');
+      else v.setCameraMode('idle');
+    }
+    this.sprites.forEach((s) => this.hideSprites(s));
+    this.hideSprites(this.idle);
+    v.syncBodies(this.snapshot3D());
+    v.render(dt);
+
+    // потеря контекста WebGL, не восстановленная за 2 с → 2D
+    if (v.lost) {
+      if (this.lost3dAt < 0) this.lost3dAt = this.nowMs;
+      else if (this.nowMs - this.lost3dAt > 2000) this.fallback2D('view3dFallback');
+    } else this.lost3dAt = -1;
+
+    // средний FPS < 40 за 3 с подряд во время раунда → 2D (?fpsguard=0 отключает — для программного WebGL в тестах)
+    if (st && st !== 'PAUSED' && st !== 'LEVEL_INTRO' && new URLSearchParams(location.search).get('fpsguard') !== '0') {
+      this.fps3d.t += dt;
+      this.fps3d.n++;
+      if (this.fps3d.t >= 3000) {
+        const fps = (this.fps3d.n * 1000) / this.fps3d.t;
+        this.fps3d = { t: 0, n: 0 };
+        if (fps < 40) this.fallback2D('view3dFallback');
+      }
+    } else this.fps3d = { t: 0, n: 0 };
   }
 
   // ------------------------------------------------------------------ спрайты
@@ -588,6 +783,10 @@ export class GameScene extends Phaser.Scene {
         ay: 0,
         cx: 0,
         cy: 0,
+        sax: 0,
+        say: 0,
+        scx: 0,
+        scy: 0,
         pull: 24 + power * 146,
         power,
         dirX: b.shot.dirX,
@@ -676,6 +875,11 @@ export class GameScene extends Phaser.Scene {
       ox = a.cx - a.ax;
       oy = a.cy - a.ay;
     }
+    if (this.view3d) {
+      this.update3D(dt);
+      this.drawAim3D(time);
+      return;
+    }
     if (st !== 'PAUSED') this.parallax.update(time, dt, ox, oy);
 
     this.syncAll();
@@ -753,9 +957,15 @@ export class GameScene extends Phaser.Scene {
       if (this.isBody(h.b)) this.depth.onHit(h.b, h.impulse, this.nowMs);
       if ((h.a === 'saka' && this.isBody(h.b) && h.b !== 'saka') || (h.b === 'saka' && this.isBody(h.a) && h.a !== 'saka')) {
         this.sakaHitAsyk = true;
-        if (h.impulse > 4) this.fx.bump(fxFlags);
+        if (h.impulse > 4) {
+          if (this.view3d) this.view3d.kick();
+          else this.fx.bump(fxFlags);
+        }
       }
-      if (h.impulse > 1.5) this.fx.dust(h.x, h.y, Math.min(1, h.impulse / 14), fxFlags);
+      if (h.impulse > 1.5) {
+        const sp = this.toScreen(h.x, h.y);
+        this.fx.dust(sp.x, sp.y, Math.min(1, h.impulse / 14), fxFlags);
+      }
       if (h.impulse > 0.8 && this.nowMs - this.lastHitSound > 45) {
         this.lastHitSound = this.nowMs;
         sfx.hit(h.impulse / 14);
@@ -768,7 +978,12 @@ export class GameScene extends Phaser.Scene {
       sfx.out();
       vibrate(HAPTIC.out);
       const sb = this.sim!.bodies.get(id);
-      if (sb) bus.emit('float', { x: sb.body.position.x, y: sb.body.position.y - 24, text: `+${r.valueOf(id)}`, kind: 'pts' });
+      if (sb) {
+        const sp = this.view3d
+          ? this.toScreen(sb.body.position.x, sb.body.position.y, 40)
+          : { x: sb.body.position.x, y: sb.body.position.y - 24 };
+        bus.emit('float', { x: sp.x, y: sp.y, text: `+${r.valueOf(id)}`, kind: 'pts' });
+      }
     }
     for (const id of res.removed) {
       const s = this.sprites.get(id);
@@ -803,8 +1018,10 @@ export class GameScene extends Phaser.Scene {
     const res = r.resolveThrow(this.pendingOut);
     const { k, points } = res.outcome;
     if (k >= 2) {
-      this.fx.shake({ motion: this.flags.motion });
-      bus.emit('float', { x: ZONE.x, y: ZONE.y, text: `+${points}`, kind: 'combo' });
+      if (this.view3d) this.view3d.kick();
+      else this.fx.shake({ motion: this.flags.motion });
+      const cp = this.toScreen(ZONE.x, ZONE.y, 60);
+      bus.emit('float', { x: cp.x, y: cp.y, text: `+${points}`, kind: 'combo' });
       sfx.combo(k);
       vibrate(HAPTIC.combo);
     }
@@ -1129,6 +1346,116 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(0xf6ecd0, 0.7);
       g.fillCircle(a.cx, a.cy, 8);
     }
+  }
+
+  // ------------------------------------------------------------------ прицел в 3D: точки на земле → проекция на экран
+  private lineW(g: Phaser.GameObjects.Graphics, x1: number, y1: number, x2: number, y2: number): void {
+    const a = this.toScreen(x1, y1);
+    const b = this.toScreen(x2, y2);
+    g.lineBetween(a.x, a.y, b.x, b.y);
+  }
+
+  private circleW(g: Phaser.GameObjects.Graphics, cx: number, cy: number, r: number, from = 0, to = Math.PI * 2): void {
+    const n = Math.max(8, Math.ceil(((to - from) / (Math.PI * 2)) * 48));
+    g.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const t = from + ((to - from) * i) / n;
+      const p = this.toScreen(cx + Math.cos(t) * r, cy + Math.sin(t) * r);
+      if (i === 0) g.moveTo(p.x, p.y);
+      else g.lineTo(p.x, p.y);
+    }
+    g.strokePath();
+  }
+
+  private drawAim3D(time: number): void {
+    const g = this.aimGfx;
+    g.clear();
+    const r = this.round;
+    if (!r || r.machine.state !== 'AIMING') {
+      this.powerText.setVisible(false);
+      return;
+    }
+    const botTurn = r.mode === 'duel' && r.player === 1;
+    // линия броска на земле
+    g.lineStyle(3, 0x16a5a3, 0.75);
+    for (let x = 30; x < FIELD_W - 30; x += 28) this.lineW(g, x, THROW_LINE_Y + 34, x + 16, THROW_LINE_Y + 34);
+
+    const a = this.aimState();
+    const p0 = this.idlePos;
+    if (!a.active) {
+      g.lineStyle(2, 0xf6ecd0, 0.45);
+      this.circleW(g, p0.x, p0.y, 46);
+      return;
+    }
+    const power = a.power;
+    const col = powerColor(power);
+    // кольцо силы — лежит на земле вокруг сақа
+    const pulse = power > 0.97 ? Math.sin(time / 70) * 3 : 0;
+    const R = 50 + pulse;
+    g.lineStyle(8, 0x2b1a0e, 0.35);
+    this.circleW(g, p0.x, p0.y, R);
+    if (a.valid || a.mode === 'keys') {
+      g.lineStyle(8, col, 1);
+      this.circleW(g, p0.x, p0.y, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.02, power));
+    }
+    const sp = this.toScreen(p0.x, p0.y);
+    this.powerText
+      .setVisible(a.valid || a.mode === 'keys')
+      .setPosition(sp.x, Math.min(FIELD_H - 24, sp.y + 76))
+      .setText(`${Math.round(power * 100)}%`)
+      .setColor('#ffffff');
+
+    if (a.valid || a.mode === 'keys') {
+      // в 3D направляющая длиннее, чем в 2D (глубину оценивать труднее); на «Лёгком» — ещё длиннее
+      const easy = store.data.difficulty === 'easy' && !botTurn;
+      if (easy) {
+        const v = POWER_MIN + (POWER_MAX - POWER_MIN) * power;
+        const reach = Math.min(v / SAKA.frictionAir, 1000);
+        g.fillStyle(0xf6ecd0, 0.6);
+        for (let d = 90; d < reach; d += 24) {
+          const q = this.toScreen(p0.x + a.dirX * d, p0.y + a.dirY * d);
+          g.fillCircle(q.x, q.y, 3);
+        }
+        g.lineStyle(3, 0xf6ecd0, 0.75);
+        this.circleW(g, p0.x + a.dirX * reach, p0.y + a.dirY * reach, 16);
+      }
+      const start = 70;
+      const len = (60 + power * 360) * (easy ? 1.3 : 1);
+      g.lineStyle(6, col, 0.95);
+      for (let d = 0; d < len; d += 26) {
+        const d2 = Math.min(len, d + 14);
+        this.lineW(g, p0.x + a.dirX * (start + d), p0.y + a.dirY * (start + d), p0.x + a.dirX * (start + d2), p0.y + a.dirY * (start + d2));
+      }
+      const ex = p0.x + a.dirX * (start + len + 6);
+      const ey = p0.y + a.dirY * (start + len + 6);
+      const nx = -a.dirY;
+      const ny = a.dirX;
+      const t1 = this.toScreen(ex + a.dirX * 16, ey + a.dirY * 16);
+      const t2 = this.toScreen(ex + nx * 11, ey + ny * 11);
+      const t3 = this.toScreen(ex - nx * 11, ey - ny * 11);
+      g.fillStyle(col, 1);
+      g.fillTriangle(t1.x, t1.y, t2.x, t2.y, t3.x, t3.y);
+    }
+    // «резинка» жеста — в экранных координатах пальца
+    if (a.mode === 'pointer') {
+      g.lineStyle(3, 0xf6ecd0, 0.55);
+      g.lineBetween(a.sax, a.say, a.scx, a.scy);
+      g.strokeCircle(a.sax, a.say, 12);
+      g.fillStyle(0xf6ecd0, 0.7);
+      g.fillCircle(a.scx, a.scy, 8);
+    }
+  }
+}
+
+/** Быстрая проверка WebGL без загрузки Three.js. */
+function hasWebGLQuick(): boolean {
+  try {
+    const c = document.createElement('canvas');
+    const gl = (c.getContext('webgl2') ?? c.getContext('webgl')) as WebGLRenderingContext | null;
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    return Boolean(gl);
+  } catch {
+    return false;
   }
 }
 

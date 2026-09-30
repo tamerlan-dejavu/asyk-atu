@@ -128,6 +128,14 @@ export const kk: Dict = {
   qualityHint: 'Төмен сапа параллаксты, секіруді және жұмсақ көлеңкені өшіреді', // verify: native speaker
   mute: 'Дыбыс', // verify: native speaker
   rotate: 'Құрылғыны тігінен бұр', // verify: native speaker
+  view: 'Көрініс', // verify: native speaker
+  view2d: '2D', // verify: native speaker
+  view3d: '3D (бета)', // verify: native speaker
+  view3dHint:
+    '3D: камера ойыншының артында, көлемді асықтар мен жарық. Әлсіз телефондарға ауырлау болуы мүмкін; ережелер мен физика бірдей.', // verify: native speaker
+  view3dLoading: '3D жүктелуде…', // verify: native speaker
+  view3dFallback: 'Бірқалыпты болу үшін 2D-ге ауыстырылды', // verify: native speaker
+  view3dNoWebgl: 'Бұл құрылғыда 3D жоқ — 2D ойнаймыз', // verify: native speaker
   profile: 'Профиль', // verify: native speaker
   profileTitle: 'Профиль және бұлт', // verify: native speaker
   cloudOff: 'Бұлт қолжетімсіз — ойын мен прогресс жергілікті жұмыс істейді', // verify: native speaker

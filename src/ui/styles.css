@@ -1568,3 +1568,23 @@ input:focus-visible {
     background-position: 0 0;
   }
 }
+
+/* 3D-вид (эксперимент): сцена Three.js под прозрачным Phaser-canvas */
+#game {
+  /* свой контекст наложения: z-index canvas'ов не выходит за контейнер игры и не перекрывает меню */
+  isolation: isolate;
+  z-index: 0;
+}
+#ui {
+  z-index: 1;
+}
+#game > canvas:not(.three-canvas) {
+  position: relative;
+  z-index: 1;
+}
+.three-canvas {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  display: block;
+}

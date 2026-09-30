@@ -349,6 +349,9 @@ function settingsScreen(): string {
       <h3>${t('sound')}</h3>
       <div class="chips">${opt('soundSet', '1', t('on'), s.sound)}${opt('soundSet', '0', t('off'), !s.sound)}</div>
       ${canVibrate ? `<h3>${t('vibration')}</h3><div class="chips">${opt('vibSet', '1', t('on'), s.vibration)}${opt('vibSet', '0', t('off'), !s.vibration)}</div>` : ''}
+      <h3>${t('view')}</h3>
+      <div class="chips">${opt('viewSet', '2d', t('view2d'), s.view !== '3d')}${opt('viewSet', '3d', t('view3d'), s.view === '3d')}</div>
+      <p class="small">${t('view3dHint')}</p>
       <h3>${t('quality')}</h3>
       <div class="chips">${opt('quality', 'auto', t('qualityAuto'), q === 'auto')}${opt('quality', 'high', t('qualityHigh'), q === 'high')}${opt('quality', 'low', t('qualityLow'), q === 'low')}</div>
       <p class="small">${t('qualityHint')}</p>
@@ -860,6 +863,15 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
       break;
     case 'vibSet':
       store.update((s) => (s.vibration = arg === '1'));
+      renderAll();
+      break;
+    case 'viewSet':
+      // ручной выбор снимает автоматический запрет 3D
+      store.update((s) => {
+        s.view = arg === '3d' ? '3d' : '2d';
+        s.view3dBlocked = false;
+      });
+      bus.emit('settings', undefined);
       renderAll();
       break;
     case 'difficulty':

@@ -22,6 +22,8 @@ const game = new Phaser.Game({
   width: Math.round(FIELD_W * S),
   height: Math.round(FIELD_H * S),
   backgroundColor: '#b8823f',
+  // прозрачный canvas: в 3D-виде под ним лежит сцена Three.js (в 2D поле закрашивает всё само)
+  transparent: true,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: [GameScene],
   banner: false,
