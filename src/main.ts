@@ -31,7 +31,15 @@ initLayout(() => game.scale.refresh());
 // На телефоне — devicePixelRatio, как раньше. На широком экране поле вписывается по высоте окна,
 // поэтому берём не меньше высоты экрана в физических пикселях (иначе на 1440p/4K картинка растягивается).
 const dpr = window.devicePixelRatio || 1;
-const S = isWide() ? Math.min(2, Math.max(dpr, ((window.screen?.height || window.innerHeight) * dpr) / FIELD_H)) : Math.min(2, dpr);
+// Телефон/планшет (сенсорный экран): память ограничена жёстче всего (iOS закрывает вкладку при перерасходе),
+// поэтому холст Phaser и запечённые текстуры поля — не больше ×1,5 и без MSAA-сглаживания: в 3D Phaser рисует
+// только прицел и эффекты поверх сцены.
+const touch = window.matchMedia('(pointer: coarse)').matches;
+const S = touch
+  ? Math.min(1.5, dpr)
+  : isWide()
+    ? Math.min(2, Math.max(dpr, ((window.screen?.height || window.innerHeight) * dpr) / FIELD_H))
+    : Math.min(2, dpr);
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -47,7 +55,7 @@ const game = new Phaser.Game({
   disableContextMenu: true,
   // Свой ввод на Pointer Events (AimController), встроенный ввод Phaser не нужен.
   input: { mouse: false, touch: false, keyboard: false, gamepad: false },
-  render: { antialias: true, powerPreference: 'high-performance' },
+  render: { antialias: !touch, powerPreference: 'high-performance' },
   fps: { target: 60 },
 });
 

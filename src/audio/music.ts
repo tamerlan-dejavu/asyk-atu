@@ -17,6 +17,7 @@ export const music = new MusicManager({
   },
   procedural: (ctx, dest, bpm) => new ProceduralDombra(ctx, dest, bpm),
   settings: () => ({ sound: store.data.sound, on: store.data.musicOn, volume: store.data.musicVolume }),
+  keepDecoded: !(typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches),
 });
 
 sfx.onUnlock(() => music.onUnlock());

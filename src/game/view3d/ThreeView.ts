@@ -53,7 +53,9 @@ interface BodyMesh {
 }
 
 const THICK: Record<string, number> = { asyk: 16, saka: 20, block: 34 };
-const MAX_DRAW_PIXEL_RATIO = { high: 2, low: 1.5 };
+/** Плотность пикселей 3D; на сенсорных устройствах (телефон) ограничена сильнее — экономия видеопамяти. */
+const TOUCH = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+const MAX_DRAW_PIXEL_RATIO = TOUCH ? { high: 1.5, low: 1.25 } : { high: 2, low: 1.5 };
 
 /**
  * 3D-вид: перспективная камера сзади-сверху, объёмные тела и свет. ТОЛЬКО отображение:

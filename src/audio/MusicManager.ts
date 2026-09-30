@@ -27,6 +27,8 @@ export interface MusicDeps {
   fetchTrack: (id: TrackId) => Promise<ArrayBuffer>;
   procedural: (ctx: AudioContext, dest: AudioNode, bpm: number) => ProceduralVoice;
   settings: () => MusicSettings;
+  /** хранить распакованными оба трека (компьютер) или только текущий (телефон: экономия памяти) */
+  keepDecoded?: boolean;
 }
 
 interface Voice {
@@ -129,7 +131,11 @@ export class MusicManager {
     const fade = this.started ? Math.max(0.05, ms / 1000) : FADE_IN_FIRST;
     this.started = true;
     this.voice = this.startVoice(ctx, master, id, buf, 0, fade);
-    if (old) this.fadeOut(ctx, old, Math.max(0.05, ms / 1000));
+    if (old) {
+      this.fadeOut(ctx, old, Math.max(0.05, ms / 1000));
+      // телефон: распакованный звук старого трека не держим (десятки МБ); при возврате распакуется снова
+      if (this.d.keepDecoded === false && old.id !== id) this.decoded.delete(old.id);
+    }
   }
 
   private startVoice(ctx: AudioContext, dest: AudioNode, id: TrackId, buf: AudioBuffer | null, offset: number, fade: number): Voice {

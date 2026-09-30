@@ -43,7 +43,13 @@ class Sfx {
     try {
       const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AC) return;
-      this.ctx = new AC();
+      // телефон: 22,05 кГц — несжатая музыка в памяти вдвое меньше (треки 64 кбит/с выше и не звучат)
+      const touch = window.matchMedia?.('(pointer: coarse)').matches;
+      try {
+        this.ctx = touch ? new AC({ sampleRate: 22050 }) : new AC();
+      } catch {
+        this.ctx = new AC();
+      }
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.7 * store.data.volume;
       this.master.connect(this.ctx.destination);
