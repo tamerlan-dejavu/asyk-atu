@@ -1,5 +1,5 @@
 import { ASYK_SETS, SAKA_SKINS, THEMES } from '../game/render/looks';
-import { ASYK_ART, assetUrl, SAKA_ART } from '../game/render/art';
+import { ASYK_ART, artUrl, SAKA_ART } from '../game/render/art';
 import { t, type Key } from '../i18n';
 import { isOwned, ITEMS, type ShopCat, type ShopItem } from '../shop/catalog';
 import { store } from '../storage/save';
@@ -24,9 +24,9 @@ function preview(it: ShopItem): string {
   const id = `g_${it.id}`;
   // сақа и асыки — рисованные ассеты (как в игре); площадки — схема карты
   if (it.cat === 'saka' && SAKA_ART[it.id])
-    return `<img class="pv art" src="${assetUrl(`saka/${SAKA_ART[it.id]}.png`)}" alt="" loading="lazy" decoding="async"/>`;
+    return `<img class="pv art" src="${artUrl('saka', `${SAKA_ART[it.id]}`)}" alt="" loading="lazy" decoding="async"/>`;
   if (it.cat === 'asyk' && ASYK_ART[it.id])
-    return `<img class="pv art" src="${assetUrl(`asyk/${ASYK_ART[it.id]}_1.png`)}" alt="" loading="lazy" decoding="async"/>`;
+    return `<img class="pv art" src="${artUrl('asyk', `${ASYK_ART[it.id]}_1`)}" alt="" loading="lazy" decoding="async"/>`;
   if (it.cat === 'saka') {
     const p = SAKA_SKINS[it.id];
     return `<svg viewBox="0 0 80 50" class="pv" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${p.c[0]}"/><stop offset=".4" stop-color="${p.c[1]}"/><stop offset=".75" stop-color="${p.c[2]}"/><stop offset="1" stop-color="${p.c[3]}"/></linearGradient></defs><polygon points="${HEX(60, 32, 40, 25)}" fill="url(#${id})" stroke="${p.outline}" stroke-width="2.4"/><line x1="18" y1="25" x2="62" y2="25" stroke="${p.inlay}" stroke-width="3"/>${p.ornament ? '<path d="M24 14 l4 4 -4 4 -4 -4z M40 14 l4 4 -4 4 -4 -4z M56 14 l4 4 -4 4 -4 -4z" fill="rgba(246,236,208,.4)"/>' : ''}</svg>`;

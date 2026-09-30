@@ -48,7 +48,8 @@ h3,
   min-width: var(--tap);
   border: 0.12em solid var(--c-gold-800);
   border-radius: var(--r-md);
-  background: linear-gradient(180deg, var(--c-turq-400), var(--c-turq-700));
+  /* бирюза затемнена: белый текст ≥ 4.5:1 */
+  background: linear-gradient(180deg, #117a78, #0b5f5d);
   color: #fff;
   font-family: var(--font-display);
   font-weight: 700;

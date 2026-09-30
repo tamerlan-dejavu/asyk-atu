@@ -4,7 +4,6 @@ import '@fontsource/montserrat-alternates/700.css';
 import '@fontsource/montserrat-alternates/800.css';
 import '@fontsource/nunito/400.css';
 import '@fontsource/nunito/700.css';
-import '@fontsource/nunito/800.css';
 import './styles/tokens.css';
 import './ui/styles.css';
 import './ui/desktop.css';

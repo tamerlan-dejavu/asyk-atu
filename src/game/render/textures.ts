@@ -3,7 +3,7 @@ import { ASYK, BLOCK, FIELD_H, FIELD_W, SAKA } from '../config';
 import { bonePolygon } from '../physics/bodies';
 import { mulberry32 } from '../levels/rng';
 import { asykPal, GOLDEN_PAL, HEAVY_PAL, sakaPal, themePal, type AsykPal, type SakaPal, type ThemePal } from './looks';
-import { ASYK_ART, SAKA_ART, TYPE_ART, VARIANTS } from './art';
+import { ASYK_ART, SAKA_ART, themeProps, TYPE_ART, VARIANTS } from './art';
 
 /** Поля вокруг слоёв параллакса, чтобы при сдвиге не открывались края. */
 export const LAYER_MARGIN = 24;
@@ -71,24 +71,8 @@ function drawShine(ctx: Ctx, img: CanvasImageSource, w: number, h: number, bw: n
   ctx.globalCompositeOperation = 'source-over';
 }
 
-/** Декор площадки по теме: какие пропсы и сколько (не физика, не заходят в кон и в зону броска). */
-const THEME_PROPS: Record<string, string[]> = {
-  theme_yard: ['props_pebble_1', 'props_pebble_2', 'props_pebble_3', 'props_twig_1', 'props_twig_2', 'props_grass_1', 'props_grass_3'],
-  theme_steppe: [
-    'props_grass_1',
-    'props_grass_2',
-    'props_grass_3',
-    'props_grass_4',
-    'props_flower_yellow',
-    'props_flower_white',
-    'props_pebble_4',
-  ],
-  theme_toy: ['props_flower_red', 'props_flower_yellow', 'props_flower_white', 'props_pebble_2', 'props_grass_2', 'props_twig_3'],
-  theme_night: ['props_snow_1', 'props_snow_2', 'props_pebble_1', 'props_pebble_5', 'props_twig_2', 'props_grass_4'],
-};
-
 function drawProps(ctx: Ctx, w: number, h: number, theme: string): void {
-  const names = THEME_PROPS[theme] ?? THEME_PROPS.theme_yard;
+  const names = themeProps(theme);
   const rnd = mulberry32(theme.length * 97 + 13);
   const zx = FIELD_W / 2 + LAYER_MARGIN;
   const zy = 350 + LAYER_MARGIN;

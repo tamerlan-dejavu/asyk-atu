@@ -14,7 +14,7 @@ import { CUSTOM_LIMIT, store } from '../storage/save';
 import type { BotLevel, CustomLevel, Difficulty, Lang, LoftLevel, Quality, Ruleset } from '../types';
 import { cloudKey, dailyKey as rsDailyKey, levelKey } from '../game/rules/ruleset';
 import { $, botLabel, coinIcon, heartIcon, icon, levelName, modeLabel, ornament, playerName, setHtml, stars, toast, u } from './common';
-import { assetUrl, SAKA_ART, uiIcon } from '../game/render/art';
+import { artUrl, cacheIcons, SAKA_ART, uiIcon } from '../game/render/art';
 import * as ed from './editor';
 import { recordsScreen, type RecordsTab } from './records';
 import { makeLink, senderName, shareCard, shareLink } from './share';
@@ -103,11 +103,11 @@ function menuScreen(): string {
   <section class="screen menu">
     <div class="dust" aria-hidden="true">${dust}</div>
     <div class="menu-top">
-      ${FEATURES.shop ? `<button class="skinbadge" data-act="goto" data-arg="shop" aria-label="${t('shop')}"><img src="${assetUrl(`saka/${SAKA_ART[saka] ?? 'saka_bronze'}.png`)}" alt="" aria-hidden="true"/>${t(`item_${saka}` as Key)}</button>` : '<span></span>'}
+      ${FEATURES.shop ? `<button class="skinbadge" data-act="goto" data-arg="shop" aria-label="${t('shop')}"><img src="${artUrl('saka', `${SAKA_ART[saka] ?? 'saka_bronze'}`)}" alt="" aria-hidden="true"/>${t(`item_${saka}` as Key)}</button>` : '<span></span>'}
       ${FEATURES.shop ? `<span class="coinbadge" aria-label="${t('coins')}">${coinIcon()} ${store.data.coins}</span>` : ''}
     </div>
     <div class="title-wrap">
-      <img class="emblem" src="${assetUrl('ui/emblem_asyk.png')}" alt="" aria-hidden="true" draggable="false"/>
+      <img class="emblem" src="${uiIcon('emblem_asyk')}" alt="" aria-hidden="true" draggable="false"/>
       <h1>${t('title')}</h1>
       <p class="tag">${t('tagline')}</p>
     </div>
@@ -1399,19 +1399,20 @@ function sparkle(el: HTMLElement): void {
  * (при первом показе экрана) — и без сети экран уровней остался бы без звёзд и замков.
  */
 function warmUp(): void {
-  for (const n of ['ui_coin', 'ui_heart', 'ui_star_full', 'ui_star_empty', 'ui_lock', 'ui_trophy', 'ui_bolt', 'ui_gear']) {
-    const img = new Image();
-    img.decoding = 'async';
-    img.src = uiIcon(n);
-  }
+  // после скачивания — перерисовать, чтобы экран уже брал иконки из памяти
+  void cacheIcons([
+    'ui_coin',
+    'ui_heart',
+    'ui_star_full',
+    'ui_star_empty',
+    'ui_lock',
+    'ui_trophy',
+    'ui_bolt',
+    'ui_gear',
+    'emblem_asyk',
+  ]).then(() => renderAll());
   const sample = 'Aa Аа Әә Ққ';
-  const faces = [
-    '700 16px "Montserrat Alternates"',
-    '800 16px "Montserrat Alternates"',
-    '400 16px Nunito',
-    '700 16px Nunito',
-    '800 16px Nunito',
-  ];
+  const faces = ['700 16px "Montserrat Alternates"', '800 16px "Montserrat Alternates"', '400 16px Nunito', '700 16px Nunito'];
   if (document.fonts?.load) for (const f of faces) void document.fonts.load(f, sample).catch(() => undefined);
 }
 
