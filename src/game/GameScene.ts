@@ -257,13 +257,18 @@ export class GameScene extends Phaser.Scene {
     const q = new URLSearchParams(location.search).get('view');
     if (q === '3d') return true;
     if (q === '2d') return false;
-    return store.data.view === '3d' && !store.data.view3dBlocked;
+    return store.data.view === '3d' && !store.data.view3dBlocked && !this.view3dSessionOff;
   }
+
+  /** 3D-модуль не загрузился (нет сети, таймаут): до перезапуска играем в 2D, устройство не блокируем. */
+  private view3dSessionOff = false;
 
   private view3dQuality: 'high' | 'low' | null = null;
 
   /** Включить/выключить 3D по настройке. Пересоздаёт вид при смене качества или темы. */
   private applyViewSetting(fromSettings: boolean): void {
+    // выбор в настройках — повторная попытка загрузить 3D после сбоя сети
+    if (fromSettings) this.view3dSessionOff = false;
     const want = this.wants3D();
     const q = this.quality3d();
     if (want && this.view3d && fromSettings && q !== this.view3dQuality) {
@@ -292,7 +297,14 @@ export class GameScene extends Phaser.Scene {
     const th = themePal(store.data.equipped.theme);
     try {
       const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
-      const mod = await Promise.race([import('./view3d/ThreeView'), timeout]);
+      let mod: typeof import('./view3d/ThreeView');
+      try {
+        mod = await Promise.race([import('./view3d/ThreeView'), timeout]);
+      } catch {
+        this.view3dSessionOff = true;
+        this.fallback2D('view3dFallback', false);
+        return;
+      }
       const v = new mod.ThreeView(this.game.canvas.parentElement!, {
         overlay: this.game.canvas,
         canvas: (key) => (this.textures.exists(key) ? (this.textures.get(key).getSourceImage() as HTMLCanvasElement) : null),
@@ -326,10 +338,10 @@ export class GameScene extends Phaser.Scene {
     (window as unknown as { __asyk3d?: unknown }).__asyk3d = undefined;
   }
 
-  /** Откат в 2D (нет WebGL, контекст потерян, FPS < 40): 3D на этом устройстве выключается до ручного включения. */
-  private fallback2D(key: 'view3dFallback' | 'view3dNoWebgl'): void {
+  /** Откат в 2D. Проблема устройства (нет WebGL, контекст потерян, FPS < 40) выключает 3D на нём до ручного включения. */
+  private fallback2D(key: 'view3dFallback' | 'view3dNoWebgl', block = true): void {
     this.disable3D();
-    if (new URLSearchParams(location.search).get('view') !== '3d') store.update((s) => (s.view3dBlocked = true));
+    if (block && new URLSearchParams(location.search).get('view') !== '3d') store.update((s) => (s.view3dBlocked = true));
     bus.emit('toast', { key });
   }
 

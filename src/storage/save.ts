@@ -62,7 +62,8 @@ export function defaultSave(): SaveV2 {
     dailyStreak: { last: '', count: 0 },
     seenHints: [],
     counters: defaultCounters(),
-    view: '2d',
+    view: '3d',
+    viewChosen: false,
     view3dBlocked: false,
   };
 }
@@ -252,8 +253,9 @@ export function sanitize(raw: unknown): SaveV2 {
       shared: Math.floor(num(cnt.shared, 0)),
       botWinsHard: Math.floor(num(cnt.botWinsHard, 0)),
     },
-    // миграция: поля нет → 2D
-    view: isV2 && r.view === '3d' ? '3d' : '2d',
+    // 2D — только если игрок выбрал его сам; прежний сохранённый '2d' был лишь значением по умолчанию → 3D
+    view: isV2 && r.viewChosen === true && r.view === '2d' ? '2d' : '3d',
+    viewChosen: isV2 && r.viewChosen === true,
     view3dBlocked: isV2 && r.view3dBlocked === true,
   };
 }

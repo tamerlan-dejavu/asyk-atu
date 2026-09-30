@@ -22,6 +22,9 @@ async function seed(page: Page): Promise<void> {
   });
 }
 
+/** Холст Phaser (ввод и интерфейс); в 3D под ним есть ещё холст Three.js. */
+const gameCanvas = (page: Page) => page.locator('canvas:not(.three-canvas)');
+
 const state = (page: Page) => page.evaluate(() => (window as any).__asyk?.state as string | undefined);
 
 async function oneThrow(page: Page): Promise<{ before: number; after: number }> {
@@ -30,7 +33,7 @@ async function oneThrow(page: Page): Promise<{ before: number; after: number }> 
   await page.waitForFunction(() => (window as any).__asyk?.state === 'AIMING');
   const before = await page.evaluate(() => (window as any).__asyk.throwsLeft as number);
 
-  const box = (await page.locator('canvas').boundingBox())!;
+  const box = (await gameCanvas(page).boundingBox())!;
   const x = box.x + box.width / 2;
   const y = box.y + box.height * 0.8;
   await page.mouse.move(x, y);
@@ -48,7 +51,7 @@ test('открыть → Играть → уровень 1 → бросок → 
   const errors = collectErrors(page);
   await seed(page);
   await page.goto('/');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(gameCanvas(page)).toBeVisible();
   const { before, after } = await oneThrow(page);
   expect(after).toBe(before - 1);
   expect(await state(page)).toBeTruthy();

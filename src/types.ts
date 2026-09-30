@@ -139,8 +139,10 @@ export interface SaveV2 extends Omit<SaveV1, 'v'> {
   dailyStreak: { last: string; count: number };
   seenHints: string[];
   counters: Counters;
-  /** вид отображения: 2D (по умолчанию) или экспериментальный 3D */
+  /** вид отображения: 3D (по умолчанию) или 2D */
   view: '2d' | '3d';
+  /** игрок сам выбрал вид в настройках (иначе действует вид по умолчанию — 3D) */
+  viewChosen: boolean;
   /** 3D автоматически выключен на этом устройстве (нет WebGL / низкий FPS) */
   view3dBlocked: boolean;
 }

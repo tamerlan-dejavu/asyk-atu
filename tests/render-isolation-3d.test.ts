@@ -58,13 +58,18 @@ describe('render-isolation: 2D и 3D', () => {
 });
 
 describe('настройка вида', () => {
-  it('сохранение без поля view читается как 2D', () => {
+  it('по умолчанию 3D; 2D — только если игрок выбрал его сам', () => {
+    expect(defaultSave().view).toBe('3d');
     const old = { ...defaultSave() } as Record<string, unknown>;
     delete old.view;
+    delete old.viewChosen;
     delete old.view3dBlocked;
-    expect(sanitize(old).view).toBe('2d');
-    expect(sanitize({ ...old, view: '3d' }).view).toBe('3d');
-    expect(sanitize({ ...old, view: 'vr' }).view).toBe('2d');
-    expect(sanitize({ v: 1, unlocked: 2 }).view).toBe('2d');
+    expect(sanitize(old).view).toBe('3d');
+    // прежнее сохранение со значением по умолчанию '2d' переходит на 3D
+    expect(sanitize({ ...old, view: '2d' }).view).toBe('3d');
+    expect(sanitize({ ...old, view: '2d', viewChosen: true }).view).toBe('2d');
+    expect(sanitize({ ...old, view: '3d', viewChosen: true }).view).toBe('3d');
+    expect(sanitize({ ...old, view: 'vr', viewChosen: true }).view).toBe('3d');
+    expect(sanitize({ v: 1, unlocked: 2 }).view).toBe('3d');
   });
 });

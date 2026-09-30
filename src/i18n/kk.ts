@@ -130,7 +130,7 @@ export const kk: Dict = {
   rotate: 'Құрылғыны тігінен бұр', // verify: native speaker
   view: 'Көрініс', // verify: native speaker
   view2d: '2D', // verify: native speaker
-  view3d: '3D (бета)', // verify: native speaker
+  view3d: '3D', // verify: native speaker
   view3dHint:
     '3D: камера ойыншының артында, көлемді асықтар мен жарық. Әлсіз телефондарға ауырлау болуы мүмкін; ережелер мен физика бірдей.', // verify: native speaker
   view3dLoading: '3D жүктелуде…', // verify: native speaker

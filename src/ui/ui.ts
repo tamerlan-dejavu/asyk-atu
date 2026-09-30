@@ -869,6 +869,7 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
       // ручной выбор снимает автоматический запрет 3D
       store.update((s) => {
         s.view = arg === '3d' ? '3d' : '2d';
+        s.viewChosen = true;
         s.view3dBlocked = false;
       });
       bus.emit('settings', undefined);
