@@ -376,9 +376,6 @@ function settingsScreen(): string {
       <h3>${t('ruleset')}</h3>
       <div class="chips">${opt('rulesetSet', 'classic', t('rulesetClassic'), s.ruleset !== 'loft')}${opt('rulesetSet', 'loft', t('rulesetLoft'), s.ruleset === 'loft')}</div>
       <p class="small">${t('rulesetHint')}</p>
-      <h3>${t('view')}</h3>
-      <div class="chips">${opt('viewSet', '2d', t('view2d'), s.view !== '3d')}${opt('viewSet', '3d', t('view3d'), s.view === '3d')}</div>
-      <p class="small">${t('view3dHint')}</p>
       <h3>${t('quality')}</h3>
       <div class="chips">${opt('quality', 'auto', t('qualityAuto'), q === 'auto')}${opt('quality', 'high', t('qualityHigh'), q === 'high')}${opt('quality', 'medium', t('qualityMedium'), q === 'medium')}${opt('quality', 'low', t('qualityLow'), q === 'low')}</div>
       <p class="small">${t('qualityHint')}</p>
@@ -985,16 +982,6 @@ function handleAction(act: string, arg: string | undefined, el: HTMLElement): vo
         s.rulesetChosen = true;
       });
       gotoScreen('levels');
-      break;
-    case 'viewSet':
-      // ручной выбор снимает автоматический запрет 3D
-      store.update((s) => {
-        s.view = arg === '3d' ? '3d' : '2d';
-        s.viewChosen = true;
-        s.view3dBlocked = false;
-      });
-      bus.emit('settings', undefined);
-      renderAll();
       break;
     case 'difficulty':
       store.update((s) => (s.difficulty = arg as Difficulty));

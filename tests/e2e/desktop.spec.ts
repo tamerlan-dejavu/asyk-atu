@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-/** Десктоп: раскладка, мышь, горячие клавиши, смена размера окна посреди раунда. Вид 2D — быстрее в CI. */
+/** Десктоп: раскладка, мышь, горячие клавиши, смена размера окна посреди раунда. */
 test.use({ viewport: { width: 1920, height: 1080 } });
 
 function collectErrors(page: Page): string[] {
@@ -26,8 +26,8 @@ async function seed(page: Page): Promise<void> {
 const game = (page: Page) => page.evaluate(() => (window as any).__asyk as { state: string; throwsLeft: number });
 const canvas = (page: Page) => page.locator('#game canvas:not(.three-canvas)');
 
-async function toLevel1(page: Page, view = '2d'): Promise<void> {
-  await page.goto(`/?view=${view}&fpsguard=0`);
+async function toLevel1(page: Page): Promise<void> {
+  await page.goto('/?fpsguard=0');
   await page.locator('[data-act="play"]').click();
   await page.locator('[data-act="level"][data-arg="1"]').click();
   await page.waitForFunction(() => (window as any).__asyk?.state === 'AIMING');
@@ -171,7 +171,7 @@ test('смена размера окна посреди раунда: раунд
 
 test('3D на десктопе: холст Three.js вписан в ту же рамку поля', async ({ page }) => {
   await seed(page);
-  await toLevel1(page, '3d');
+  await toLevel1(page);
   await page.waitForFunction(() => !!document.querySelector('canvas.three-canvas'), undefined, { timeout: 30_000 });
   await page.waitForTimeout(500);
   const [a, b] = await page.evaluate(() =>

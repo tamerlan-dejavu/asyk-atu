@@ -296,23 +296,19 @@ export class GameScene extends Phaser.Scene {
     if (ground) bus.emit('backdrop', { ground, far: src('far') });
   }
 
-  // ------------------------------------------------------------------ 3D-вид (эксперимент)
+  // ------------------------------------------------------------------ 3D-вид (единственный вид игры)
+  /** Игра всегда в 3D. Запасная плоская отрисовка — только если 3D на устройстве невозможен (см. fallback). */
   private wants3D(): boolean {
-    const q = new URLSearchParams(location.search).get('view');
-    if (q === '3d') return true;
-    if (q === '2d') return false;
-    return store.data.view === '3d' && !store.data.view3dBlocked && !this.view3dSessionOff;
+    return !this.view3dSessionOff;
   }
 
-  /** 3D-модуль не загрузился (нет сети, таймаут): до перезапуска играем в 2D, устройство не блокируем. */
+  /** 3D невозможен в этом запуске (нет WebGL, модуль не загрузился, контекст потерян) — без запоминания. */
   private view3dSessionOff = false;
 
   private view3dQuality: 'high' | 'low' | null = null;
 
-  /** Включить/выключить 3D по настройке. Пересоздаёт вид при смене качества или темы. */
+  /** Включить 3D (при старте и смене настроек). Пересоздаёт вид при смене качества. */
   private applyViewSetting(fromSettings: boolean): void {
-    // выбор в настройках — повторная попытка загрузить 3D после сбоя сети
-    if (fromSettings) this.view3dSessionOff = false;
     const want = this.wants3D();
     const q = this.quality3d();
     if (want && this.view3d && fromSettings && q !== this.view3dQuality) {
@@ -332,7 +328,7 @@ export class GameScene extends Phaser.Scene {
   private async enable3D(announce = false): Promise<void> {
     if (this.view3d || this.view3dLoading) return;
     if (!hasWebGLQuick()) {
-      this.fallback2D('view3dNoWebgl');
+      this.fallback('view3dNoWebgl');
       return;
     }
     this.view3dLoading = true;
@@ -345,8 +341,7 @@ export class GameScene extends Phaser.Scene {
       try {
         mod = await Promise.race([import('./view3d/ThreeView'), timeout]);
       } catch {
-        this.view3dSessionOff = true;
-        this.fallback2D('view3dFallback', false);
+        this.fallback('view3dFallback');
         return;
       }
       const v = new mod.ThreeView(this.game.canvas.parentElement!, {
@@ -367,7 +362,7 @@ export class GameScene extends Phaser.Scene {
       this.apply3DLayers(true);
       (window as unknown as { __asyk3d?: unknown }).__asyk3d = { stats: () => v.stats() };
     } catch {
-      this.fallback2D('view3dFallback');
+      this.fallback('view3dFallback');
     } finally {
       this.view3dLoading = false;
     }
@@ -383,10 +378,10 @@ export class GameScene extends Phaser.Scene {
     (window as unknown as { __asyk3d?: unknown }).__asyk3d = undefined;
   }
 
-  /** Откат в 2D. Проблема устройства (нет WebGL, контекст потерян, FPS < 40) выключает 3D на нём до ручного включения. */
-  private fallback2D(key: 'view3dFallback' | 'view3dNoWebgl', block = true): void {
+  /** 3D невозможен (нет WebGL, модуль не загрузился, контекст потерян): запасная отрисовка до перезапуска. */
+  private fallback(key: 'view3dFallback' | 'view3dNoWebgl'): void {
+    this.view3dSessionOff = true;
     this.disable3D();
-    if (block && new URLSearchParams(location.search).get('view') !== '3d') store.update((s) => (s.view3dBlocked = true));
     bus.emit('toast', { key });
   }
 
@@ -458,20 +453,25 @@ export class GameScene extends Phaser.Scene {
     v.syncBodies(this.snapshot3D());
     v.render(dt);
 
-    // потеря контекста WebGL, не восстановленная за 2 с → 2D
+    // потеря контекста WebGL, не восстановленная за 2 с → запасная отрисовка
     if (v.lost) {
       if (this.lost3dAt < 0) this.lost3dAt = this.nowMs;
-      else if (this.nowMs - this.lost3dAt > 2000) this.fallback2D('view3dFallback');
+      else if (this.nowMs - this.lost3dAt > 2000) this.fallback('view3dFallback');
     } else this.lost3dAt = -1;
 
-    // средний FPS < 40 за 3 с подряд во время раунда → 2D (?fpsguard=0 отключает — для программного WebGL в тестах)
+    // средний FPS < 40 за 3 с во время раунда при качестве «Авто» → облегчённое 3D (?fpsguard=0 отключает — для тестов)
     if (st && st !== 'PAUSED' && st !== 'LEVEL_INTRO' && new URLSearchParams(location.search).get('fpsguard') !== '0') {
       this.fps3d.t += dt;
       this.fps3d.n++;
       if (this.fps3d.t >= 3000) {
         const fps = (this.fps3d.n * 1000) / this.fps3d.t;
         this.fps3d = { t: 0, n: 0 };
-        if (fps < 40) this.fallback2D('view3dFallback');
+        if (fps < 40 && store.data.quality === 'auto' && this.view3dQuality === 'high') {
+          this.autoStep = 2;
+          document.documentElement.dataset.perf = 'low';
+          this.disable3D();
+          void this.enable3D();
+        }
       }
     } else this.fps3d = { t: 0, n: 0 };
   }

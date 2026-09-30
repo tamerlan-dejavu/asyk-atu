@@ -161,8 +161,6 @@ export function rightPanel(c: SideCtx): string {
       </div>
       <h3>${t('quality')}</h3>
       <div class="chips">${chip('quality', 'auto', t('qualityAuto'), q === 'auto')}${chip('quality', 'high', t('qualityHigh'), q === 'high')}${chip('quality', 'medium', t('qualityMedium'), q === 'medium')}${chip('quality', 'low', t('qualityLow'), q === 'low')}</div>
-      <h3>${t('view')}</h3>
-      <div class="chips">${chip('viewSet', '2d', t('view2d'), s.view !== '3d')}${chip('viewSet', '3d', t('view3d'), s.view === '3d')}</div>
       ${
         themes.length > 1
           ? `<h3>${t('sideTheme')}</h3><div class="chips">${themes.map((i) => chip('equip', i.id, t(`item_${i.id}` as Key), s.equipped.theme === i.id)).join('')}</div>`

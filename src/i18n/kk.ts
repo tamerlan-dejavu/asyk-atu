@@ -142,14 +142,9 @@ export const kk: Dict = {
   hintLoft:
     'Биіктен: оң жақтан биіктікті таңда. Биік лақтыру тас пен асықтан асады, төмені әрі қарай сырғиды. Жердегі шеңбер — түсетін нүкте.', // verify: native speaker
   rulesetOf: 'Ереже: {name}', // verify: native speaker
-  view: 'Көрініс', // verify: native speaker
-  view2d: '2D', // verify: native speaker
-  view3d: '3D', // verify: native speaker
-  view3dHint:
-    '3D: камера ойыншының артында, көлемді асықтар мен жарық. Әлсіз телефондарға ауырлау болуы мүмкін; ережелер мен физика бірдей.', // verify: native speaker
   view3dLoading: '3D жүктелуде…', // verify: native speaker
-  view3dFallback: 'Бірқалыпты болу үшін 2D-ге ауыстырылды', // verify: native speaker
-  view3dNoWebgl: 'Бұл құрылғыда 3D жоқ — 2D ойнаймыз', // verify: native speaker
+  view3dFallback: 'Графика жеңілдетілді: көлемді режим қолжетімсіз', // verify: native speaker
+  view3dNoWebgl: 'Бұл құрылғыда көлемді графика қолжетімсіз — жеңілдетілген режим қосылды', // verify: native speaker
   profile: 'Профиль', // verify: native speaker
   profileTitle: 'Профиль және бұлт', // verify: native speaker
   cloudOff: 'Бұлт қолжетімсіз — ойын мен прогресс жергілікті жұмыс істейді', // verify: native speaker

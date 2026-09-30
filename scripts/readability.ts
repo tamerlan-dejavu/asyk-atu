@@ -1,6 +1,6 @@
 /**
  * Матрица читаемости: карта × набор асыков × сақа (уровень с обычными, золотыми, тяжёлыми асыками и блоками)
- * → docs/design/readability.png. Вид 2D, качество «Высокое», анимации выключены.
+ * → docs/design/readability.png. Качество «Высокое», анимации выключены.
  *
  *   npm run build && npm run preview     # в другом терминале
  *   node scripts/readability.ts
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
           ),
         [theme, set, saka],
       );
-      await p.goto(`${BASE}/?view=2d&fpsguard=0`);
+      await p.goto(`${BASE}/?fpsguard=0`);
       await p.locator('[data-act="play"]').click();
       await p.locator(`[data-act="level"][data-arg="${LEVEL}"]`).click();
       await p.waitForFunction(() => (window as any).__asyk?.state === 'AIMING');

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Программный WebGL (SwiftShader): цифры FPS здесь ничего не значат, поэтому ?fpsguard=0
 // отключает автоматический откат в 2D по FPS.
-const URL = '/?view=3d&fpsguard=0';
+const URL = '/?fpsguard=0';
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -48,28 +48,5 @@ test('3D: страница загружается, два canvas, бросок �
   await page.waitForFunction(() => ['AIMING', 'LEVEL_COMPLETE'].includes((window as any).__asyk?.state), undefined, { timeout: 90_000 });
   expect(await page.evaluate(() => (window as any).__asyk.throwsLeft)).toBe(before - 1);
   expect(await has3d(page)).toBe(true);
-  expect(errors).toEqual([]);
-});
-
-test('3D: 20 переключений 2D↔3D без утечек и ошибок', async ({ page }) => {
-  test.setTimeout(240_000);
-  const errors = collectErrors(page);
-  await seed(page);
-  await page.goto('/?fpsguard=0');
-  await page.locator('[data-act="goto"][data-arg="settings"]').click();
-  let first: { geometries: number; textures: number } | null = null;
-  let last: { geometries: number; textures: number } | null = null;
-  for (let i = 0; i < 20; i++) {
-    await page.locator('[data-act="viewSet"][data-arg="3d"]').click();
-    await page.waitForFunction(() => Boolean((window as any).__asyk3d), undefined, { timeout: 30_000 });
-    await page.waitForTimeout(150); // хотя бы один кадр отрисован
-    const st = await page.evaluate(() => (window as any).__asyk3d.stats());
-    first ??= { geometries: st.geometries, textures: st.textures };
-    last = { geometries: st.geometries, textures: st.textures };
-    await page.locator('[data-act="viewSet"][data-arg="2d"]').click();
-    await page.waitForFunction(() => !(window as any).__asyk3d);
-    await expect(page.locator('#game canvas')).toHaveCount(1);
-  }
-  expect(last).toEqual(first);
   expect(errors).toEqual([]);
 });
