@@ -125,7 +125,7 @@ export const kk: Dict = {
   qualityAuto: 'Авто', // verify: native speaker
   qualityHigh: 'Жоғары', // verify: native speaker
   qualityLow: 'Төмен', // verify: native speaker
-  qualityHint: 'Төмен сапа параллаксты, секіруді және жұмсақ көлеңкені өшіреді', // verify: native speaker
+  qualityHint: 'Орташа — жиексіз және бұлыңғырсыз, төмен — сондай-ақ параллакссыз, секірусіз, жұмсақ көлеңкесіз және ұшқынсыз', // verify: native speaker
   mute: 'Дыбыс', // verify: native speaker
   rotate: 'Құрылғыны тігінен бұр', // verify: native speaker
   overshoot: 'Асып кетті!', // verify: native speaker
@@ -401,4 +401,6 @@ export const kk: Dict = {
   rarityCommon: 'Қарапайым', // verify: native speaker
   rarityRare: 'Сирек', // verify: native speaker
   rarityEpic: 'Эпикалық', // verify: native speaker
+  volume: 'Дыбыс деңгейі', // verify: native speaker
+  qualityMedium: 'Орташа', // verify: native speaker
 };

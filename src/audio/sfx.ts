@@ -24,7 +24,7 @@ class Sfx {
       if (!AC) return;
       this.ctx = new AC();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.5;
+      this.master.gain.value = 0.7 * store.data.volume;
       this.master.connect(this.ctx.destination);
       const len = Math.floor(this.ctx.sampleRate * 0.4);
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -37,6 +37,11 @@ class Sfx {
     } catch {
       this.ctx = null;
     }
+  }
+
+  /** Громкость 0…1 из настроек (mute — отдельный переключатель «Звук»). */
+  setVolume(v: number): void {
+    if (this.master) this.master.gain.value = 0.7 * Math.min(1, Math.max(0, v));
   }
 
   private ready(): boolean {
@@ -118,6 +123,36 @@ class Sfx {
 
   click(): void {
     this.tone(660, 0.05, 'sine', 0.12);
+  }
+
+  /** Тяжёлый асык: низкий глухой удар. */
+  heavy(strength: number): void {
+    const s = Math.min(1, Math.max(0.3, strength));
+    this.tone(70, 0.28, 'sine', 0.35 * s, 0, 38);
+    this.burst(0.18, 0.3 * s, 220, 0, 0.6);
+  }
+
+  /** Натяжение рогатки: короткий «скрип», выше с силой (вызывать не чаще раза в ~120 мс). */
+  stretch(power: number): void {
+    this.tone(220 + power * 260, 0.06, 'triangle', 0.05 + power * 0.04);
+  }
+
+  /** Блеск золотого асыка. */
+  shimmer(): void {
+    [1568, 2093, 2637].forEach((f, i) => this.tone(f, 0.18, 'sine', 0.09, i * 0.05));
+  }
+
+  /** Монета (при подсчёте тиын). */
+  coin(): void {
+    this.tone(1318, 0.07, 'square', 0.05);
+    this.tone(1976, 0.09, 'sine', 0.06, 0.035);
+  }
+
+  /** Звезда на экране итога (i = 0…2 — выше с каждой). */
+  star(i: number): void {
+    const f = [784, 988, 1175][Math.min(2, i)];
+    this.tone(f, 0.22, 'triangle', 0.2);
+    this.tone(f * 2, 0.16, 'sine', 0.07, 0.03);
   }
 }
 

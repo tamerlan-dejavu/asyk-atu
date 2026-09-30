@@ -743,3 +743,51 @@ kbd {
 #overlay #screen.shown {
   background: radial-gradient(ellipse at 50% 20%, rgba(49, 61, 132, 0.4), transparent 60%), rgba(11, 14, 38, 0.8);
 }
+
+/* ---------- слайдер громкости ---------- */
+.slider {
+  display: grid;
+  grid-template-columns: auto 1fr 3em;
+  align-items: center;
+  gap: var(--sp-12);
+  font-weight: 700;
+}
+.slider input[type='range'] {
+  pointer-events: auto;
+  width: 100%;
+  min-height: var(--tap);
+  accent-color: var(--c-gold-500);
+}
+.slider output {
+  text-align: right;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- итог: звёзды вспыхивают, искры, счётчики ---------- */
+.stars.big .sti.lit {
+  filter: drop-shadow(0 0 0.35em rgba(255, 207, 74, 0.9));
+}
+.spark {
+  position: absolute;
+  width: 0.45em;
+  height: 0.45em;
+  margin: -0.22em 0 0 -0.22em;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, var(--c-gold-300) 45%, rgba(255, 207, 74, 0) 70%);
+  pointer-events: none;
+  animation: spark-fly 520ms var(--ease-out) forwards;
+}
+.count {
+  font-variant-numeric: tabular-nums;
+}
+@keyframes spark-fly {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+    opacity: 0;
+  }
+}

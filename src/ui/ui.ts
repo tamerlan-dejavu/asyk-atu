@@ -371,6 +371,7 @@ function settingsScreen(): string {
       <p class="small">${t('diffHint')}</p>
       <h3>${t('sound')}</h3>
       <div class="chips">${opt('soundSet', '1', t('on'), s.sound)}${opt('soundSet', '0', t('off'), !s.sound)}</div>
+      <label class="slider"><span>${t('volume')}</span><input type="range" min="0" max="100" step="5" data-vol="1" value="${Math.round(s.volume * 100)}" aria-label="${t('volume')}"/><output>${Math.round(s.volume * 100)}%</output></label>
       ${canVibrate ? `<h3>${t('vibration')}</h3><div class="chips">${opt('vibSet', '1', t('on'), s.vibration)}${opt('vibSet', '0', t('off'), !s.vibration)}</div>` : ''}
       <h3>${t('ruleset')}</h3>
       <div class="chips">${opt('rulesetSet', 'classic', t('rulesetClassic'), s.ruleset !== 'loft')}${opt('rulesetSet', 'loft', t('rulesetLoft'), s.ruleset === 'loft')}</div>
@@ -379,7 +380,7 @@ function settingsScreen(): string {
       <div class="chips">${opt('viewSet', '2d', t('view2d'), s.view !== '3d')}${opt('viewSet', '3d', t('view3d'), s.view === '3d')}</div>
       <p class="small">${t('view3dHint')}</p>
       <h3>${t('quality')}</h3>
-      <div class="chips">${opt('quality', 'auto', t('qualityAuto'), q === 'auto')}${opt('quality', 'high', t('qualityHigh'), q === 'high')}${opt('quality', 'low', t('qualityLow'), q === 'low')}</div>
+      <div class="chips">${opt('quality', 'auto', t('qualityAuto'), q === 'auto')}${opt('quality', 'high', t('qualityHigh'), q === 'high')}${opt('quality', 'medium', t('qualityMedium'), q === 'medium')}${opt('quality', 'low', t('qualityLow'), q === 'low')}</div>
       <p class="small">${t('qualityHint')}</p>
       <label class="field"><span>${t('yourName')}</span><input data-name="0" maxlength="16" placeholder="${t('yourNamePh')}" autocomplete="off"/></label>
       ${FEATURES.cloud ? `<button class="btn sec" data-act="goto" data-arg="profile">👤 ${t('profile')}</button>` : ''}
@@ -494,7 +495,9 @@ function pauseModal(): string {
 }
 
 function coinsLine(r: ResultData): string {
-  return r.coins > 0 && FEATURES.shop ? `<p class="coins">${coinIcon()} ${t('coinsEarned', { n: r.coins })}</p>` : '';
+  return r.coins > 0 && FEATURES.shop
+    ? `<p class="coins">${coinIcon()} ${t('coinsEarned', { n: `<b class="count coin" data-to="${r.coins}">${r.coins}</b>` })}</p>`
+    : '';
 }
 
 function resultModal(r: ResultData): string {
@@ -517,7 +520,7 @@ function resultModal(r: ResultData): string {
     const e = r.endless;
     return `<div class="modal"><div class="panel pop result lose">
       <h2>${t('waveReached', { n: e.wave })}</h2>${ornament()}
-      <p class="total">${t('runScore', { n: e.total })}</p>
+      <p class="total">${t('runScore', { n: `<b class="count" data-to="${e.total}">${e.total}</b>` })}</p>
       <p class="small">${t('endlessBest', { score: store.data.endlessBest.score, wave: store.data.endlessBest.wave })}</p>
       ${e.newBest ? `<p class="badge">${t('newRecord')}</p>` : ''}
       ${friendCompare(r, e.total)}
@@ -570,7 +573,7 @@ function resultModal(r: ResultData): string {
     ${showStars ? stars(s.stars, true) : ''}
     ${!win ? `<p class="small">${t('defeatHint')}</p>` : ''}
     <ul class="lines">${lines}</ul>
-    <p class="total">${t('totalScore', { n: s.score })}</p>
+    <p class="total">${t('totalScore', { n: `<b class="count" data-to="${s.score}">${s.score}</b>` })}</p>
     ${r.newRecord ? `<p class="badge">${t('newRecord')}</p>` : ''}
     ${best}
     ${friendCompare(r, s.score)}
@@ -1327,6 +1330,70 @@ function onKey(e: KeyboardEvent): void {
   }
 }
 
+/** Итог раунда: звёзды загораются по очереди (звук + искры), очки и тиын «набегают». */
+function animateResult(r: ResultData): void {
+  const modal = $('modal');
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const starsOn = [...modal.querySelectorAll<HTMLElement>('.stars.big .sti.on')];
+  starsOn.forEach((el, i) =>
+    window.setTimeout(
+      () => {
+        if (!el.isConnected) return;
+        sfx.star(i);
+        el.classList.add('lit');
+        if (!reduced) sparkle(el);
+      },
+      reduced ? 0 : 280 + i * 320,
+    ),
+  );
+  const delay = reduced ? 0 : 250 + starsOn.length * 320;
+  modal.querySelectorAll<HTMLElement>('.count').forEach((el) => {
+    const to = Number(el.dataset.to) || 0;
+    if (reduced || to <= 0) return;
+    const coin = el.classList.contains('coin');
+    el.textContent = '0';
+    const dur = Math.min(900, 300 + to * 6);
+    let last = 0;
+    const t0 = performance.now() + delay;
+    const tick = (now: number) => {
+      if (!el.isConnected) return;
+      const u = Math.max(0, Math.min(1, (now - t0) / dur));
+      const v = Math.round(to * (1 - Math.pow(1 - u, 3)));
+      el.textContent = String(v);
+      if (
+        coin &&
+        v !== last &&
+        now - t0 > 0 &&
+        Math.floor(v / Math.max(1, Math.ceil(to / 8))) !== Math.floor(last / Math.max(1, Math.ceil(to / 8)))
+      )
+        sfx.coin();
+      last = v;
+      if (u < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  void r;
+}
+
+/** Искры вокруг элемента (DOM, 8 штук, удаляются по окончании анимации). */
+function sparkle(el: HTMLElement): void {
+  const host = el.closest('.panel') as HTMLElement | null;
+  if (!host) return;
+  const a = el.getBoundingClientRect();
+  const b = host.getBoundingClientRect();
+  for (let i = 0; i < 8; i++) {
+    const s = document.createElement('i');
+    s.className = 'spark';
+    const ang = (i / 8) * Math.PI * 2;
+    s.style.left = `${a.left - b.left + a.width / 2}px`;
+    s.style.top = `${a.top - b.top + a.height / 2}px`;
+    s.style.setProperty('--dx', `${Math.cos(ang) * 2.2}em`);
+    s.style.setProperty('--dy', `${Math.sin(ang) * 2.2}em`);
+    s.addEventListener('animationend', () => s.remove());
+    host.appendChild(s);
+  }
+}
+
 /**
  * Иконки интерфейса и начертания шрифтов подгружаются сразу после старта: иначе браузер запросит их лениво
  * (при первом показе экрана) — и без сети экран уровней остался бы без звёзд и замков.
@@ -1338,7 +1405,13 @@ function warmUp(): void {
     img.src = uiIcon(n);
   }
   const sample = 'Aa Аа Әә Ққ';
-  const faces = ['700 16px "Montserrat Alternates"', '800 16px "Montserrat Alternates"', '400 16px Nunito', '700 16px Nunito', '800 16px Nunito'];
+  const faces = [
+    '700 16px "Montserrat Alternates"',
+    '800 16px "Montserrat Alternates"',
+    '400 16px Nunito',
+    '700 16px Nunito',
+    '800 16px Nunito',
+  ];
   if (document.fonts?.load) for (const f of faces) void document.fonts.load(f, sample).catch(() => undefined);
 }
 
@@ -1360,9 +1433,21 @@ export function initUI(): void {
         training = t.checked;
         renderAll();
       }
+      if (t.dataset.vol !== undefined) {
+        sfx.unlock();
+        sfx.click();
+      }
     });
     el.addEventListener('input', (e) => {
       const t = e.target as HTMLInputElement;
+      if (t.dataset.vol !== undefined) {
+        const v = Number(t.value) / 100;
+        store.update((s) => (s.volume = v));
+        sfx.setVolume(v);
+        const out = t.parentElement?.querySelector('output');
+        if (out) out.textContent = `${t.value}%`;
+        return;
+      }
       if (t.dataset.name !== undefined) {
         const i = Number(t.dataset.name) as 0 | 1;
         store.update((s) => (s.playerNames[i] = t.value.slice(0, 16)));
@@ -1444,6 +1529,7 @@ export function initUI(): void {
       }
     }
     renderModal();
+    animateResult(r);
   });
   bus.on('float', ({ x, y, text, kind }) => {
     const d = document.createElement('div');

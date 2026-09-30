@@ -1,5 +1,5 @@
 export type Lang = 'ru' | 'kk' | 'en';
-export type Quality = 'auto' | 'high' | 'low';
+export type Quality = 'auto' | 'high' | 'medium' | 'low';
 export type GameMode = 'campaign' | 'training' | 'versus' | 'daily' | 'endless' | 'duel' | 'custom';
 export type Difficulty = 'easy' | 'normal';
 export type BotLevel = 'easy' | 'normal' | 'hard';
@@ -51,6 +51,8 @@ export interface SaveV1 {
   v: 1;
   lang: Lang;
   sound: boolean;
+  /** громкость эффектов 0…1 (выключение — «Звук») */
+  volume: number;
   quality: Quality;
   tutorialDone: boolean;
   unlocked: number;

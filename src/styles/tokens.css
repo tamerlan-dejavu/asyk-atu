@@ -84,8 +84,14 @@
   --blur: 10px;
 }
 
-/* низкое качество: без размытия (дорого на слабой графике) */
-:root[data-quality='low'] {
+/* среднее и низкое качество (или автопонижение по FPS): без размытия (дорого на слабой графике) */
+:root[data-quality='medium'],
+:root[data-perf='medium'] {
+  --blur: 0px;
+  --surface: rgba(20, 26, 66, 0.92);
+}
+:root[data-quality='low'],
+:root[data-perf='low'] {
   --blur: 0px;
   --surface: rgba(20, 26, 66, 0.96);
 }

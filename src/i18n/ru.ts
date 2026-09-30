@@ -124,7 +124,7 @@ export const ru = {
   qualityAuto: 'Авто',
   qualityHigh: 'Высокое',
   qualityLow: 'Низкое',
-  qualityHint: 'Низкое отключает параллакс, подпрыгивание и мягкие тени',
+  qualityHint: 'Среднее — без ореола и размытия, низкое — ещё без параллакса, подпрыгивания, мягких теней и искр',
   mute: 'Звук',
   rotate: 'Поверни устройство вертикально',
   overshoot: 'Перелёт!',
@@ -397,6 +397,8 @@ export const ru = {
   rarityCommon: 'Обычный',
   rarityRare: 'Редкий',
   rarityEpic: 'Эпический',
+  volume: 'Громкость',
+  qualityMedium: 'Среднее',
 } as const;
 
 export type Dict = Record<keyof typeof ru, string>;

@@ -125,7 +125,7 @@ export const en: Dict = {
   qualityAuto: 'Auto',
   qualityHigh: 'High',
   qualityLow: 'Low',
-  qualityHint: 'Low disables parallax, bounce and soft shadows',
+  qualityHint: 'Medium drops the outline and blur; low also drops parallax, bounce, soft shadows and sparks',
   mute: 'Sound',
   rotate: 'Rotate your device to portrait',
   overshoot: 'Overshot!',
@@ -399,4 +399,6 @@ export const en: Dict = {
   rarityCommon: 'Common',
   rarityRare: 'Rare',
   rarityEpic: 'Epic',
+  volume: 'Volume',
+  qualityMedium: 'Medium',
 };

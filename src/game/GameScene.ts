@@ -36,9 +36,10 @@ import { Sim, type SimBody, type StepResult } from './physics/sim';
 import { COIN, levelCoins, processEvent, type AchEvent } from './rules/achievements';
 import { DepthTracker } from './render/depth';
 import { Effects, type FxFlags } from './render/effects';
+import { COLOR } from '../ui/tokens';
 import { Parallax } from './render/parallax';
 import { bakeAll, bakeLook, setArtSource, SHINE_FRAMES, TEX, variantKey } from './render/textures';
-import { artFiles, artKey, VARIANTS } from './render/art';
+import { artFiles, artKey, skinFx, VARIANTS } from './render/art';
 import { themePal } from './render/looks';
 import { fitCamera, screenToGround } from './view3d/camera3d';
 import type { BodySnapshot } from './view3d/sync';
@@ -132,7 +133,11 @@ export class GameScene extends Phaser.Scene {
   private sakaFade = -1;
   private pointerOffset = { x: 0, y: 0 };
   private lastHitSound = 0;
-  private autoLow = false;
+  /** хитстоп: на 40–60 мс после сильного удара физика «замирает» (только время на экране; шаги симуляции те же) */
+  private hitstopMs = 0;
+  private lastHitstop = -1000;
+  /** «Авто»: ступень понижения по FPS — 0 высокое, 1 среднее, 2 низкое */
+  private autoStep = 0;
   private fpsAcc = { t: 0, n: 0 };
   private reducedMq = window.matchMedia('(prefers-reduced-motion: reduce)');
   private nowMs = 0;
@@ -320,8 +325,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private quality3d(): 'high' | 'low' {
-    const q = store.data.quality;
-    return q === 'low' || (q === 'auto' && this.autoLow) ? 'low' : 'high';
+    return this.level3() === 'low' ? 'low' : 'high';
   }
 
   /** announce — показать «Загружаем 3D…» (только при ручном включении; при запуске 3D грузится молча). */
@@ -546,7 +550,7 @@ export class GameScene extends Phaser.Scene {
     z: number,
     alpha: number,
     scaleMul: number,
-    flags: { soft: boolean; bounce: boolean },
+    flags: { soft: boolean; bounce: boolean; halo?: boolean },
     hlMul = 1,
     hz = 0,
     tilt = 0,
@@ -579,7 +583,7 @@ export class GameScene extends Phaser.Scene {
       .setDisplaySize(tex.w * scale, tex.h * scale * squash)
       .setAlpha(alpha);
     if (s.halo) {
-      const on = flags.soft && alpha > 0.05;
+      const on = (flags.halo ?? flags.soft) && alpha > 0.05;
       s.halo.setVisible(on);
       if (on)
         s.halo
@@ -625,11 +629,38 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ качество / доступность
-  private get flags(): { soft: boolean; bounce: boolean; parallax: boolean; drift: boolean; motion: boolean } {
+  /** Действующий уровень качества: выбранный или (для «Авто») понижённый по FPS. */
+  private level3(): 'high' | 'medium' | 'low' {
     const q = store.data.quality;
-    const low = q === 'low' || (q === 'auto' && this.autoLow);
+    if (q !== 'auto') return q;
+    return this.autoStep >= 2 ? 'low' : this.autoStep === 1 ? 'medium' : 'high';
+  }
+
+  /**
+   * Качество: высокое — мягкие тени, ореол, все частицы, размытие панелей; среднее — без ореола и размытия;
+   * низкое — простые тени, без тяжёлых частиц и размытия.
+   */
+  private get flags(): {
+    soft: boolean;
+    bounce: boolean;
+    parallax: boolean;
+    drift: boolean;
+    motion: boolean;
+    rich: boolean;
+    halo: boolean;
+  } {
+    const lv = this.level3();
+    const low = lv === 'low';
     const reduced = this.reducedMq.matches;
-    return { soft: !low, bounce: !low && !reduced, parallax: !low && !reduced, drift: !low && !reduced, motion: !reduced };
+    return {
+      soft: !low,
+      bounce: !low && !reduced,
+      parallax: !low && !reduced,
+      drift: !low && !reduced,
+      motion: !reduced,
+      rich: !low && !reduced,
+      halo: lv === 'high',
+    };
   }
 
   // ------------------------------------------------------------------ раунд
@@ -936,8 +967,14 @@ export class GameScene extends Phaser.Scene {
     if (this.tutorial && this.round?.throwsUsed === 0) bus.emit('tutorial', { step: 0 });
   }
 
+  private lastStretch = { t: 0, p: 0 };
   private onAimMove(s: AimState): void {
     if (this.tutorial && s.valid) bus.emit('tutorial', { step: 1 });
+    // скрип рогатки: при заметном изменении силы, не чаще раза в 120 мс
+    if (s.valid && this.nowMs - this.lastStretch.t > 120 && Math.abs(s.power - this.lastStretch.p) > 0.08) {
+      this.lastStretch = { t: this.nowMs, p: s.power };
+      sfx.stretch(s.power);
+    }
   }
 
   private onAimCancel(): void {
@@ -991,8 +1028,13 @@ export class GameScene extends Phaser.Scene {
           this.onRelease(s.power, s.dirX, s.dirY, s.loft);
         }
       }
-      if (r.machine.state === 'FLYING' || r.machine.state === 'SETTLING') this.stepPhysics(dt);
+      if (r.machine.state === 'FLYING' || r.machine.state === 'SETTLING') {
+        if (this.hitstopMs > 0) this.hitstopMs -= dt;
+        else this.stepPhysics(dt);
+        this.sakaTrail(f);
+      }
     }
+    this.fx.update(st === 'PAUSED' ? 0 : dt);
 
     // параллакс: при прицеливании — вектор оттягивания, иначе — положение указателя
     const a = this.aim.state;
@@ -1013,6 +1055,15 @@ export class GameScene extends Phaser.Scene {
     this.drawAim(time);
   }
 
+  /** След сақа в полёте: цвет и частицы по надетому скину. */
+  private sakaTrail(f: { motion: boolean; rich: boolean }): void {
+    const sk = this.sim?.saka;
+    if (!sk || sk.removed || sk.body.speed < 4) return;
+    const fx = skinFx(store.data.equipped.saka);
+    const sp = this.toScreen(sk.body.position.x, sk.body.position.y, sk.z);
+    this.fx.trail(sp.x, sp.y, fx.trail, fx.fx, { motion: f.motion, rich: f.rich });
+  }
+
   private tickTimers(dt: number): void {
     if (this.timers.length === 0) return;
     const due: (() => void)[] = [];
@@ -1027,9 +1078,9 @@ export class GameScene extends Phaser.Scene {
     due.forEach((fn) => fn());
   }
 
-  /** Автопереключение качества: FPS < 45 в среднем за 2 с → «Низкое». */
+  /** Автопонижение качества: средний FPS за 3 с ниже 45 → на ступень ниже (высокое → среднее → низкое). */
   private monitorFps(dt: number): void {
-    if (store.data.quality !== 'auto' || this.autoLow) return;
+    if (store.data.quality !== 'auto' || this.autoStep >= 2) return;
     const st = this.round?.machine.state;
     if (!st || st === 'PAUSED' || st === 'LEVEL_INTRO') {
       this.fpsAcc = { t: 0, n: 0 };
@@ -1037,9 +1088,13 @@ export class GameScene extends Phaser.Scene {
     }
     this.fpsAcc.t += dt;
     this.fpsAcc.n++;
-    if (this.fpsAcc.t >= 2000) {
+    if (this.fpsAcc.t >= 3000) {
       const fps = (this.fpsAcc.n * 1000) / this.fpsAcc.t;
-      if (fps < 45) this.autoLow = true;
+      if (fps < 45) {
+        this.autoStep++;
+        // панели интерфейса тоже без размытия
+        document.documentElement.dataset.perf = this.level3();
+      }
       this.fpsAcc = { t: 0, n: 0 };
     }
   }
@@ -1077,17 +1132,38 @@ export class GameScene extends Phaser.Scene {
 
   private processStep(res: StepResult): void {
     const f = this.flags;
-    const fxFlags: FxFlags = { motion: f.motion };
+    const fxFlags: FxFlags = { motion: f.motion, rich: f.rich };
     const r = this.round!;
     for (const h of res.hits) {
       if (this.isBody(h.a)) this.depth.onHit(h.a, h.impulse, this.nowMs);
       if (this.isBody(h.b)) this.depth.onHit(h.b, h.impulse, this.nowMs);
       if ((h.a === 'saka' && this.isBody(h.b) && h.b !== 'saka') || (h.b === 'saka' && this.isBody(h.a) && h.a !== 'saka')) {
         this.sakaHitAsyk = true;
+        const other = h.a === 'saka' ? h.b : h.a;
+        const type = r.typeOf(other);
+        const sp = this.toScreen(h.x, h.y);
+        const skin = skinFx(store.data.equipped.saka);
         if (h.impulse > 4) {
           if (this.view3d) this.view3d.kick();
           else this.fx.bump(fxFlags);
+          // попадание: вспышка и волна цвета скина, частицы скина
+          this.fx.flash(sp.x, sp.y, 46, skin.trail, fxFlags);
+          this.fx.wave(sp.x, sp.y, 90, skin.trail, fxFlags);
+          if (skin.fx === 'sparks' || skin.fx === 'neon') this.fx.sparks(sp.x, sp.y, skin.trail, 8, 160, fxFlags);
+          if (skin.fx === 'embers') this.fx.sparks(sp.x, sp.y, 0xff7a2a, 8, 120, fxFlags, 300);
         }
+        // сильный удар: хитстоп 50 мс и тряска (тяжёлый асык — сильнее и с глухим звуком)
+        if (h.impulse > 7 && f.motion && this.nowMs - this.lastHitstop > 300) {
+          this.hitstopMs = 50;
+          this.lastHitstop = this.nowMs;
+          if (!this.view3d) this.fx.shake(fxFlags, type === 'heavy' ? 4 : 2.5, 120);
+        }
+        if (type === 'heavy' && h.impulse > 3) {
+          sfx.heavy(Math.min(1, h.impulse / 12));
+          if (!this.view3d) this.fx.shake(fxFlags, 4, 160);
+        }
+        if (type === 'block' && h.impulse > 2) this.fx.dust(sp.x, sp.y, 1, fxFlags);
+        if (type === 'golden' && h.impulse > 2) this.fx.sparks(sp.x, sp.y, COLOR.gold400, 6, 140, fxFlags);
       }
       if (h.impulse > 1.5) {
         const sp = this.toScreen(h.x, h.y);
@@ -1106,6 +1182,15 @@ export class GameScene extends Phaser.Scene {
       vibrate(HAPTIC.out);
       const sb = this.sim!.bodies.get(id);
       if (sb) {
+        const gp = this.toScreen(sb.body.position.x, sb.body.position.y);
+        const golden = r.typeOf(id) === 'golden';
+        this.fx.sparks(gp.x, gp.y, golden ? COLOR.gold400 : COLOR.cream100, golden ? 14 : 8, 170, fxFlags);
+        this.fx.dust(gp.x, gp.y, 0.8, fxFlags);
+        // кромка кона подсвечивается там, где асык её пересёк
+        const ang = Math.atan2(sb.body.position.y - ZONE.y, sb.body.position.x - ZONE.x);
+        const edge = this.toScreen(ZONE.x + Math.cos(ang) * ZONE.r, ZONE.y + Math.sin(ang) * ZONE.r);
+        this.fx.wave(edge.x, edge.y, 70, COLOR.turq400, fxFlags);
+        if (golden) sfx.shimmer();
         const sp = this.view3d
           ? this.toScreen(sb.body.position.x, sb.body.position.y, 40)
           : { x: sb.body.position.x, y: sb.body.position.y - 24 };

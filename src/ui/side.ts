@@ -160,7 +160,7 @@ export function rightPanel(c: SideCtx): string {
         ${fullscreenSupported() ? `<button class="btn sec sm" data-act="fullscreen" aria-pressed="${fs}">⛶ ${t(fs ? 'fullscreenExit' : 'fullscreen')}</button>` : ''}
       </div>
       <h3>${t('quality')}</h3>
-      <div class="chips">${chip('quality', 'auto', t('qualityAuto'), q === 'auto')}${chip('quality', 'high', t('qualityHigh'), q === 'high')}${chip('quality', 'low', t('qualityLow'), q === 'low')}</div>
+      <div class="chips">${chip('quality', 'auto', t('qualityAuto'), q === 'auto')}${chip('quality', 'high', t('qualityHigh'), q === 'high')}${chip('quality', 'medium', t('qualityMedium'), q === 'medium')}${chip('quality', 'low', t('qualityLow'), q === 'low')}</div>
       <h3>${t('view')}</h3>
       <div class="chips">${chip('viewSet', '2d', t('view2d'), s.view !== '3d')}${chip('viewSet', '3d', t('view3d'), s.view === '3d')}</div>
       ${

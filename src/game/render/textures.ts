@@ -850,4 +850,20 @@ export function bakeAll(scene: Phaser.Scene, S: number, zoneR: number, look: Loo
   bake(scene, 'hlAsyk', 22, 16, S, (c) => drawHighlight(c, 22, 16, false));
   bake(scene, 'hlSaka', 30, 20, S, (c) => drawHighlight(c, 30, 20, true));
   bake(scene, 'dust', 32, 32, S, (c) => drawDust(c, 32));
+  // частицы эффектов: светящаяся точка (тонируется цветом скина) и кольцо волны удара
+  bake(scene, 'spark', 24, 24, S, (c) => {
+    const g = c.createRadialGradient(12, 12, 0, 12, 12, 12);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.35, 'rgba(255,255,255,0.8)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, 24, 24);
+  });
+  bake(scene, 'ringFx', 64, 64, S, (c) => {
+    c.strokeStyle = 'rgba(255,255,255,0.95)';
+    c.lineWidth = 3;
+    c.beginPath();
+    c.arc(32, 32, 28, 0, Math.PI * 2);
+    c.stroke();
+  });
 }

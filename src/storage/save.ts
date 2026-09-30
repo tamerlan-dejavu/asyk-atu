@@ -41,6 +41,7 @@ export function defaultSave(): SaveV2 {
     v: 2,
     lang: 'ru',
     sound: true,
+    volume: 0.8,
     quality: 'auto',
     tutorialDone: false,
     unlocked: 0,
@@ -193,7 +194,8 @@ export function sanitize(raw: unknown): SaveV2 {
   if (!isObj(raw)) return d;
   const r = raw;
   const lang: Lang = r.lang === 'kk' || r.lang === 'en' || r.lang === 'ru' ? r.lang : d.lang;
-  const quality: Quality = r.quality === 'high' || r.quality === 'low' || r.quality === 'auto' ? r.quality : d.quality;
+  const quality: Quality =
+    r.quality === 'high' || r.quality === 'medium' || r.quality === 'low' || r.quality === 'auto' ? r.quality : d.quality;
   const levels: Record<string, LevelStat> = {};
   if (isObj(r.levels)) {
     for (const [k, v] of Object.entries(r.levels)) {
@@ -223,6 +225,7 @@ export function sanitize(raw: unknown): SaveV2 {
     v: 2,
     lang,
     sound: typeof r.sound === 'boolean' ? r.sound : d.sound,
+    volume: typeof r.volume === 'number' && Number.isFinite(r.volume) ? Math.min(1, Math.max(0, r.volume)) : d.volume,
     quality,
     tutorialDone: typeof r.tutorialDone === 'boolean' ? r.tutorialDone : d.tutorialDone,
     unlocked: Math.min(MAX_PRO_LEVEL, Math.floor(num(r.unlocked, 0))),
