@@ -73,8 +73,7 @@ async function shoot(browser: Browser, s: (typeof SIZES)[number]): Promise<void>
   await shot('settings');
 
   await home(p);
-  await p.locator('[data-act="goto"][data-arg="modes"]').click();
-  await p.locator('[data-act="goto"][data-arg="shop"]').click();
+  await p.locator('.mgrid2 [data-act="goto"][data-arg="shop"]').click();
   await p.waitForTimeout(500);
   await shot('shop');
 

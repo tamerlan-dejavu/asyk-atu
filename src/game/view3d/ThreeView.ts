@@ -4,7 +4,8 @@ import { FAR_H, LAYER_MARGIN, TEX } from '../render/textures';
 import type { AsykType } from '../../types';
 import { ASPECT, fitCamera, project as projectPure, type CamParams, type Projected } from './camera3d';
 import { meshTransform, type BodySnapshot } from './sync';
-import { assetUrl, SAKA_LOOKS_LIKE_ASYK } from '../render/art';
+import { assetUrl } from '../render/art';
+import { sakaStyle } from '../render/skins';
 import {
   CanvasTexture,
   Color,
@@ -32,6 +33,8 @@ import {
 export type CameraMode = 'idle' | 'aim' | 'follow' | 'settle';
 
 export interface ThreeViewOptions {
+  /** id надетого скина сақа (стиль модели) */
+  saka: () => string;
   /** Phaser-canvas, поверх которого рисуются прицел и эффекты */
   overlay: HTMLCanvasElement;
   /** холсты текстур, запечённых 2D-кодом (render/textures.ts) */
@@ -142,8 +145,7 @@ export class ThreeView {
       [mat.map, mat.metalnessMap].forEach((t) => t && this.disposables.push(t));
       // уже созданные асыки перестраиваются моделью при следующей синхронизации
       for (const [id, m] of this.meshes)
-        if ((m.kind.startsWith('asyk:') && m.kind !== 'asyk:block') || (SAKA_LOOKS_LIKE_ASYK && m.kind.startsWith('saka:')))
-          this.removeMesh(id);
+        if ((m.kind.startsWith('asyk:') && m.kind !== 'asyk:block') || m.kind.startsWith('saka:')) this.removeMesh(id);
     } catch {
       /* без модели — прежняя геометрия */
     }
@@ -174,6 +176,24 @@ export class ThreeView {
     } catch {
       return new Color(1, 1, 1);
     }
+  }
+
+  /** Материал сақа: модель асыка в стиле надетого скина (skins.ts). Один на сцену, обновляется при смене скина. */
+  private sakaMat: MeshStandardMaterial | null = null;
+  private sakaMaterial(): MeshStandardMaterial {
+    if (!this.sakaMat) {
+      this.sakaMat = this.asykModel!.mat.clone();
+      this.disposables.push(this.sakaMat);
+    }
+    const st = sakaStyle(this.opt.saka());
+    const m = this.sakaMat;
+    m.color = new Color(st.color);
+    m.metalness = st.metalness;
+    m.roughness = st.roughness;
+    m.emissive = new Color(st.emissive);
+    m.emissiveMap = m.map;
+    m.emissiveIntensity = st.emissiveIntensity;
+    return m;
   }
 
   /** Материал модели по типу асыка: обычный — тонировка набора, золотой — металл с блеском, тяжёлый — тёмный. */
@@ -430,12 +450,12 @@ export class ThreeView {
     const key = `${kind}:${b.type}`;
     if (found && found.kind === key) return found;
     if (found) this.removeMesh(b.id);
-    const asSaka = kind === 'saka' && SAKA_LOOKS_LIKE_ASYK;
+    const asSaka = kind === 'saka';
     const model = (kind === 'asyk' || asSaka) && this.asykModel;
     const body = model
-      ? new Mesh(this.asykModel!.geo, this.modelMaterial(asSaka ? 'normal' : b.type))
+      ? new Mesh(this.asykModel!.geo, asSaka ? this.sakaMaterial() : this.modelMaterial(b.type))
       : new Mesh(this.geometry(kind), this.materials(kind, b.type));
-    // временно: сақа — та же модель асыка в размере сақа (56×34), чуть крупнее мишеней
+    // сақа — та же модель асыка в размере сақа (56×34) и в стиле надетого скина
     if (model && asSaka) body.scale.set(SAKA.w / ASYK.w, SAKA.h / ASYK.h, SAKA.h / ASYK.h);
     body.castShadow = this.opt.quality === 'high';
     body.receiveShadow = false;
@@ -496,6 +516,7 @@ export class ThreeView {
     // набор асыков сменился — тонировка модели пересчитывается
     const normal = this.mats.get('model:normal');
     if (normal) (normal[0] as MeshStandardMaterial).color = this.setTint();
+    if (this.sakaMat) this.sakaMaterial();
   }
 
   // ---------------------------------------------------------------- камера

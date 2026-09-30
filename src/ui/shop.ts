@@ -74,7 +74,7 @@ export function shopScreen(overlay: ShopOverlay): string {
         : '';
   return `
   <section class="screen">
-    <header class="bar"><button class="btn sec sm" data-act="goto" data-arg="modes">← ${t('back')}</button><h2>${t('shopTitle')}</h2><span class="coinbadge" aria-label="${t('coins')}">${coinIcon()} ${s.coins}</span></header>
+    <header class="bar"><button class="btn sec sm" data-act="goto" data-arg="menu">← ${t('back')}</button><h2>${t('shopTitle')}</h2><span class="coinbadge" aria-label="${t('coins')}">${coinIcon()} ${s.coins}</span></header>
     ${ornament()}
     <div class="panel scroll">
       <p class="small">${t('earnHint')}</p>

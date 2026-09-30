@@ -3,25 +3,18 @@
  * спрайт вписывается в размер тела из config.ts. Если файл не загрузился, остаётся процедурная отрисовка.
  */
 import type { AsykType } from '../../types';
+import { SAKA_STYLE } from './skins';
 
 const BASE = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
 export const assetUrl = (path: string): string => `${BASE}assets/${path}`;
 /** Картинка ассета: WebP (в 4 раза легче PNG, с прозрачностью); PNG лежат рядом как исходники. */
 export const artUrl = (dir: string, name: string): string => assetUrl(`${dir}/${name}.webp`);
 
-/** Скин сақа → файл. jade и onyx (набор «Той-Pro») нарисованы как «дракон» и «неон». */
-export const SAKA_ART: Record<string, string> = {
-  saka_bronze: 'saka_bronze',
-  saka_silver: 'saka_silver',
-  saka_gold: 'saka_gold',
-  saka_oyu: 'saka_oyu',
-  saka_jade: 'saka_dragon',
-  saka_onyx: 'saka_neon',
-  saka_eagle: 'saka_eagle',
-  saka_snowleopard: 'saka_snowleopard',
-  saka_tulpar: 'saka_tulpar',
-  saka_lava: 'saka_lava',
-};
+/**
+ * Скин сақа → картинка (2D и магазин). Все скины — одна 3D-модель асыка в разных стилях
+ * (src/game/render/skins.ts), картинки отрендерены scripts/render-saka-skins.ts; имя файла = id скина.
+ */
+export const SAKA_ART: Record<string, string> = Object.fromEntries(Object.keys(SAKA_STYLE).map((id) => [id, id]));
 
 /** Набор асыков → префикс файлов (по 3 варианта: _1, _2, _3). */
 export const ASYK_ART: Record<string, string> = { asyk_bone: 'asyk_bone', asyk_red: 'asyk_red', asyk_wood: 'asyk_wood' };
@@ -46,12 +39,6 @@ export const THEME_PROPS: Record<string, string[]> = {
 export const themeProps = (theme: string): string[] => THEME_PROPS[theme] ?? THEME_PROPS.theme_yard;
 
 export const artKey = (name: string): string => `art:${name}`;
-
-/**
- * ВРЕМЕННО: игрок бросает асык, а не сақа — только внешний вид (физика и хитбокс сақа 56×34 прежние).
- * 2D: картинка асыка надетого набора; 3D: модель асыка, крупнее мишеней. false — вернуть сақа.
- */
-export const SAKA_LOOKS_LIKE_ASYK = true;
 
 /** Эффект сақа по скину: цвет следа и вид частиц при полёте/ударе. */
 export type SkinFx = 'none' | 'sparks' | 'glow' | 'neon' | 'embers';

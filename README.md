@@ -130,7 +130,7 @@ Claude (Anthropic) — генерация кода и технического �
 - [Phaser](https://phaser.io) — MIT; [Matter.js](https://brm.io/matter-js/) (встроен в Phaser) — MIT.
 - [Three.js](https://threejs.org) — MIT (3D-вид, в том числе загрузчик GLTF).
 - Шрифты [Montserrat Alternates](https://fonts.google.com/specimen/Montserrat+Alternates) и [Nunito](https://fonts.google.com/specimen/Nunito) — SIL Open Font License 1.1, подключены локально через `@fontsource`.
-- Рисованные ассеты `public/assets/{saka,asyk,props,ui}` — пак проекта (сақа, асыки, декор, иконки, эмблема). Поле и фон рисуются кодом, звук синтезируется.
+- Рисованные ассеты `public/assets/{asyk,props,ui}` — пак проекта (асыки, декор, иконки, эмблема). Скины сақа — та же 3D-модель асыка (см. ниже) в 10 стилях (`src/game/render/skins.ts`); картинки для 2D и магазина отрендерены из неё (`scripts/render-saka-skins.ts`). Поле и фон рисуются кодом, звук синтезируется.
 - **3D-модель асыка** `public/assets/models/asyk.glb` — «[Asyq (асық, асык) 3d model](https://sketchfab.com/3d-models/asyq-3d-model-098b2e1cbda7465cb31177ac7c4dfe57)», автор [cozaim](https://sketchfab.com/cozaim), лицензия [CC BY-NC 4.0](http://creativecommons.org/licenses/by-nc/4.0/) (только некоммерческое использование, с указанием автора). Изменения: упрощена сетка (14 032 → 3 643 вершины), уменьшены текстуры, модель повёрнута и вписана в размер тела (`scripts/optimize-asyk-model.ts`).
 - Зависимости сверх базовых (`phaser`, `typescript`, `vite`, `vitest`, `@playwright/test`):
   - `@supabase/supabase-js` (MIT) — клиент облака; загружается динамическим импортом только при включённом облаке;
