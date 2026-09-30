@@ -353,6 +353,7 @@ export class GameScene extends Phaser.Scene {
         overlay: this.game.canvas,
         canvas: (key) => (this.textures.exists(key) ? (this.textures.get(key).getSourceImage() as HTMLCanvasElement) : null),
         quality,
+        saka: () => store.data.equipped.saka,
         reducedMotion: this.reducedMq.matches,
         palette: { sky: th.sky[0], horizon: th.sky[2], ground: th.ground[1], hemiSky: th.sky[0], hemiGround: th.ground[1] },
       });

@@ -328,6 +328,10 @@ h3,
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-8);
 }
+/* нечётное число кнопок: последняя — во всю ширину */
+.mgrid2 > .wide:nth-child(odd):last-child {
+  grid-column: 1 / -1;
+}
 
 /* ---------- карточки: уровни, режимы, магазин, достижения ---------- */
 .card,

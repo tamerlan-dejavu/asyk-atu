@@ -116,9 +116,10 @@ function menuScreen(): string {
       <button class="btn ${rs ? '' : 'primary big'}" data-act="play">${t('play')}</button>
       <div class="mgrid2">
         <button class="btn sec" data-act="goto" data-arg="modes">${icon('ui_bolt')} ${t('modes')}</button>
+        ${FEATURES.shop ? `<button class="btn sec" data-act="goto" data-arg="shop">${coinIcon()} ${t('shop')}</button>` : ''}
         <button class="btn sec" data-act="goto" data-arg="records">${icon('ui_trophy')} ${t('records')}</button>
         <button class="btn sec" data-act="goto" data-arg="rules">${icon('ui_star_full')} ${t('howTo')}</button>
-        <button class="btn sec" data-act="goto" data-arg="settings">${icon('ui_gear')} ${t('settings')}</button>
+        <button class="btn sec wide" data-act="goto" data-arg="settings">${icon('ui_gear')} ${t('settings')}</button>
       </div>
     </div>
     ${FEATURES.cloud ? `<div class="menu-sync">${syncLabel()}</div>` : ''}
@@ -151,7 +152,6 @@ function modesScreen(): string {
       ${FEATURES.editor ? card('goto', 'mine', '📂', 'myLevels', 'modeMineDesc', ` · ${store.data.customLevels.length}/${CUSTOM_LIMIT}`) : ''}
       ${card('loftPlay', '', icon('ui_bolt'), 'rulesetLoft', 'modeLoftDesc')}
       ${FEATURES.cloud ? card('goto', 'board', icon('ui_trophy'), 'leaderboard', 'modeBoardDesc') : ''}
-      ${FEATURES.shop ? card('goto', 'shop', coinIcon(), 'shop', 'modeShopDesc', ` · ${store.data.coins}`) : ''}
     </div>
   </section>`;
 }
