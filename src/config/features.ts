@@ -16,6 +16,8 @@ export const FEATURES = {
   achievements: true,
   /** облако (Supabase): вход, синхронизация, рейтинг, короткие ссылки */
   cloud: cloudConfigured,
-  /** Vercel Web Analytics + Speed Insights (только на реальном домене) */
+  /** Vercel Speed Insights (только на реальном домене) */
   analytics: true,
+  /** Vercel Web Analytics: скрипт есть, только если аналитика включена в проекте Vercel, иначе 404 */
+  webAnalytics: env.VITE_VERCEL_WEB_ANALYTICS === 'true',
 } as const;

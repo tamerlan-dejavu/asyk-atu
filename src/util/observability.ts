@@ -25,7 +25,7 @@ export function initErrorReporting(): void {
   window.addEventListener('unhandledrejection', (e) => report((e.reason as Error)?.message ?? e.reason));
 }
 
-/** Vercel Web Analytics и Speed Insights: без cookie; только на реальном домене и в production-сборке. */
+/** Vercel Speed Insights и (если включена в проекте) Web Analytics: без cookie; только на реальном домене и в production-сборке. */
 export function initAnalytics(): void {
   if (!FEATURES.analytics || !import.meta.env.PROD) return;
   const host = location.hostname;
@@ -33,7 +33,9 @@ export function initAnalytics(): void {
   const w = window as unknown as { va?: (...a: unknown[]) => void; vaq?: unknown[]; si?: (...a: unknown[]) => void; siq?: unknown[] };
   w.va ??= (...a: unknown[]) => void (w.vaq ??= []).push(a);
   w.si ??= (...a: unknown[]) => void (w.siq ??= []).push(a);
-  for (const src of ['/_vercel/insights/script.js', '/_vercel/speed-insights/script.js']) {
+  const scripts = ['/_vercel/speed-insights/script.js'];
+  if (FEATURES.webAnalytics) scripts.push('/_vercel/insights/script.js');
+  for (const src of scripts) {
     const s = document.createElement('script');
     s.defer = true;
     s.src = src;
